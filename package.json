@@ -3,6 +3,30 @@
   "version": "1.0.0",
   "description": "YAML-driven form schema resolver — produces FormSchema JSON for any form renderer",
   "license": "MIT",
+  "keywords": [
+    "form",
+    "form-schema",
+    "form-builder",
+    "form-renderer",
+    "yaml",
+    "schema",
+    "dynamic-forms",
+    "field-types",
+    "react",
+    "json-schema",
+    "form-validation",
+    "multi-tenant",
+    "i18n",
+    "headless"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/letkode/form-schema-js.git"
+  },
+  "homepage": "https://github.com/letkode/form-schema-js#readme",
+  "bugs": {
+    "url": "https://github.com/letkode/form-schema-js/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
