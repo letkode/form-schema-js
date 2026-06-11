@@ -68,6 +68,27 @@ export interface FieldOptionGroup {
   options: FieldOption[]
 }
 
+/**
+ * Present on a field when options_source.pre_load is false.
+ * The renderer uses this to load options lazily at mount time.
+ */
+export interface ResolvedOptionsSource {
+  type: string
+  /** Fully resolved URL — domain already applied from repository.baseUrl or connection.baseUrl */
+  url: string
+  http_method: string
+  /** true for repository sources — renderer must send the user's JWT */
+  requires_auth: boolean
+  /** Connection name used (api type only) — renderer may use it to look up extra headers */
+  connection: string | null
+  /** Query params to append on every request */
+  params: Record<string, unknown>
+  /** Key in the API response object to use as option value */
+  value_key: string
+  /** Key in the API response object to use as option label/text */
+  label_key: string
+}
+
 // ---------------------------------------------------------------------------
 // Field attributes
 // ---------------------------------------------------------------------------
@@ -126,6 +147,8 @@ export interface FormField {
   style: string[]
   options: FieldOption[]
   option_groups?: FieldOptionGroup[]
+  /** Populated when options_source.pre_load is false. Null when options are already inlined. */
+  options_source: ResolvedOptionsSource | null
   translations: Record<string, Partial<{ name: string; placeholder: string; description: string }>>
   interactions: FieldInteraction[]
 }
@@ -191,7 +214,24 @@ export interface RawOptionsFile {
 
 export interface RawOptionsSource {
   type: string
-  tag: string
+  /** Whether to resolve options during schema loading (true) or defer to renderer (false). Default: false */
+  pre_load?: boolean
+  // --- catalog ---
+  tag?: string
+  // --- repository ---
+  class?: string
+  method?: string
+  // --- api ---
+  connection?: string
+  endpoint?: string
+  http_method?: string
+  // --- shared (repository + api) ---
+  /** Key in the API response object to use as option value. Default: 'value' */
+  value_key?: string
+  /** Key in the API response object to use as option label/text. Default: 'label' */
+  label_key?: string
+  /** Extra query params sent on every request */
+  params?: Record<string, unknown>
 }
 
 export interface RawFieldAttributes {
@@ -257,4 +297,35 @@ export interface RawFormFile {
   render?: Partial<RenderConfig>
   translations?: Record<string, Partial<{ name: string; description: string }>>
   sections?: RawSection[]
+}
+
+// ---------------------------------------------------------------------------
+// Resolver external config types (used by OptionsSourceDefinition)
+// ---------------------------------------------------------------------------
+
+export interface RepositoryConfig {
+  /** Base URL of the backend (e.g. import.meta.env.VITE_API_URL) */
+  baseUrl: string
+  /**
+   * URL path pattern for repository calls.
+   * Use :class and :method as placeholders.
+   * If a placeholder is absent it is sent as a query param instead.
+   * Example: '/form-options/:class/:method'
+   */
+  pathPattern: string
+  /** Returns the current user's JWT token to attach as Authorization header */
+  getToken?: () => string | null
+}
+
+export interface ConnectionConfig {
+  /** Base URL of the external API */
+  baseUrl: string
+  /** Static headers sent on every request (API keys, tokens, etc.) */
+  headers?: Record<string, string>
+}
+
+export interface ResolverExternalConfig {
+  yamlBaseUrl: string
+  repository?: RepositoryConfig
+  connections?: Record<string, ConnectionConfig>
 }

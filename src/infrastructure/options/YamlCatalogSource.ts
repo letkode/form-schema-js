@@ -1,19 +1,23 @@
 import { load } from 'js-yaml'
-import type { FieldOption, RawOptionsFile } from '../../domain/types.js'
+import type { FieldOption, RawOptionsSource, RawOptionsFile, ResolvedOptionsSource, ResolverExternalConfig } from '../../domain/types.js'
 
 export interface OptionsSourceDefinition {
   getType(): string
-  resolve(tag: string, baseUrl: string): Promise<FieldOption[]>
+  /** Catalog is always pre-loaded; repository and api support deferred loading */
+  isAlwaysPreLoad(): boolean
+  resolve(source: RawOptionsSource, config: ResolverExternalConfig): Promise<FieldOption[]>
+  buildLazyOutput?(source: RawOptionsSource, config: ResolverExternalConfig): ResolvedOptionsSource
 }
 
 export class YamlCatalogSource implements OptionsSourceDefinition {
   getType() { return 'catalog' }
+  isAlwaysPreLoad() { return true }
 
-  async resolve(tag: string, baseUrl: string): Promise<FieldOption[]> {
-    const url = `${baseUrl}/options/${tag}.yaml`
+  async resolve(source: RawOptionsSource, config: ResolverExternalConfig): Promise<FieldOption[]> {
+    const url = `${config.yamlBaseUrl}/options/${source.tag}.yaml`
     const response = await fetch(url)
     if (!response.ok) {
-      throw new Error(`[form-schema] Failed to load options catalog "${tag}" from ${url} (${response.status})`)
+      throw new Error(`[form-schema] Failed to load options catalog "${source.tag}" from ${url} (${response.status})`)
     }
     const text = await response.text()
     const raw = load(text) as RawOptionsFile

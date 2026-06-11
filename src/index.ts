@@ -3,6 +3,7 @@ export type * from './domain/types.js'
 
 // Application layer
 export { FormSchemaResolver } from './application/resolver/FormSchemaResolver.js'
+export type { ResolverConfig } from './application/resolver/FormSchemaResolver.js'
 export { FormSchemaRegistry, UnknownFieldTypeError } from './application/registry/FormSchemaRegistry.js'
 export { YamlLoader } from './application/loader/YamlLoader.js'
 
@@ -21,8 +22,11 @@ export type { InteractionHandlerDefinition } from './infrastructure/interactions
 export { ALL_INTERACTION_HANDLERS } from './infrastructure/interactions/index.js'
 
 // Infrastructure — options
-export { YamlCatalogSource } from './infrastructure/options/index.js'
+export { YamlCatalogSource, RepositoryOptionsSource, ApiOptionsSource } from './infrastructure/options/index.js'
 export type { OptionsSourceDefinition } from './infrastructure/options/index.js'
+
+// Utils
+export { normalizeApiResponse } from './utils/normalizeApiResponse.js'
 
 // ---------------------------------------------------------------------------
 // Convenience factory
@@ -30,23 +34,47 @@ export type { OptionsSourceDefinition } from './infrastructure/options/index.js'
 
 import { FormSchemaRegistry } from './application/registry/FormSchemaRegistry.js'
 import { FormSchemaResolver } from './application/resolver/FormSchemaResolver.js'
+import type { RepositoryConfig, ConnectionConfig } from './domain/types.js'
 
 export interface CreateResolverConfig {
   /** Base URL where form-schema YAML files are served from (e.g. '/resources/form-schema') */
   baseUrl: string
+  /** Config for options_source type "repository" (internal backend, always authenticated) */
+  repository?: RepositoryConfig
+  /** Named external API connections for options_source type "api" */
+  connections?: Record<string, ConnectionConfig>
   /** Optional pre-configured registry. If omitted a default registry with all built-ins is used. */
   registry?: FormSchemaRegistry
 }
 
 /**
  * Create a ready-to-use FormSchemaResolver with all built-in field types,
- * renders, interaction handlers, and the YAML catalog options source.
+ * renders, interaction handlers, and all built-in options sources.
  *
  * @example
- * const resolver = createFormSchemaResolver({ baseUrl: '/resources/form-schema' })
+ * const resolver = createFormSchemaResolver({
+ *   baseUrl: '/resources/form-schema',
+ *   repository: {
+ *     baseUrl: import.meta.env.VITE_API_URL,
+ *     pathPattern: '/form-options/:class/:method',
+ *     getToken: () => localStorage.getItem('token'),
+ *   },
+ *   connections: {
+ *     crm: {
+ *       baseUrl: 'https://crm.external.com',
+ *       headers: { 'X-API-Key': import.meta.env.VITE_CRM_KEY },
+ *     },
+ *   },
+ * })
+ *
  * const schema = await resolver.withLocale('es').withContext('create').resolve('user_profile')
  */
 export function createFormSchemaResolver(config: CreateResolverConfig): FormSchemaResolver {
   const registry = config.registry ?? new FormSchemaRegistry()
-  return new FormSchemaResolver({ registry, baseUrl: config.baseUrl })
+  return new FormSchemaResolver({
+    registry,
+    baseUrl: config.baseUrl,
+    repository: config.repository,
+    connections: config.connections,
+  })
 }

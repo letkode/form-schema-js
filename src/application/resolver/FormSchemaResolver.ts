@@ -8,15 +8,24 @@ import type {
   FieldAttributes,
   RenderConfig,
   FieldOption,
+  ResolvedOptionsSource,
   RawFormFile,
   RawSection,
   RawGroup,
   RawField,
+  RepositoryConfig,
+  ConnectionConfig,
+  ResolverExternalConfig,
 } from '../../domain/types.js'
 
-interface ResolverConfig {
+export interface ResolverConfig {
   registry: FormSchemaRegistry
+  /** Base URL where YAML files are served from (e.g. '/resources/form-schema') */
   baseUrl: string
+  /** Config for options_source type "repository" (internal backend calls) */
+  repository?: RepositoryConfig
+  /** Named external API connections for options_source type "api" */
+  connections?: Record<string, ConnectionConfig>
 }
 
 interface ResolverState {
@@ -27,13 +36,11 @@ interface ResolverState {
 }
 
 export class FormSchemaResolver {
-  private readonly registry: FormSchemaRegistry
-  private readonly baseUrl: string
+  private readonly config: ResolverConfig
   private readonly state: ResolverState
 
   constructor(config: ResolverConfig, state?: ResolverState) {
-    this.registry = config.registry
-    this.baseUrl = config.baseUrl.replace(/\/$/, '')
+    this.config = { ...config, baseUrl: config.baseUrl.replace(/\/$/, '') }
     this.state = state ?? { locale: 'en', context: null, includeSections: null, excludeSections: null }
   }
 
@@ -54,7 +61,7 @@ export class FormSchemaResolver {
   }
 
   async resolve(formTag: string): Promise<FormSchema> {
-    const raw = await YamlLoader.loadForm(this.baseUrl, formTag)
+    const raw = await YamlLoader.loadForm(this.config.baseUrl, formTag)
     return this.resolveForm(raw)
   }
 
@@ -89,10 +96,7 @@ export class FormSchemaResolver {
       return true
     })
 
-    const resolved = await Promise.all(
-      filtered.map((s) => this.resolveSection(s))
-    )
-
+    const resolved = await Promise.all(filtered.map((s) => this.resolveSection(s)))
     return resolved.sort((a, b) => a.position - b.position)
   }
 
@@ -117,11 +121,7 @@ export class FormSchemaResolver {
 
   private async resolveGroups(rawGroups: RawGroup[]): Promise<FormGroup[]> {
     const filtered = rawGroups.filter((g) => g.enabled ?? true)
-
-    const resolved = await Promise.all(
-      filtered.map((g) => this.resolveGroup(g))
-    )
-
+    const resolved = await Promise.all(filtered.map((g) => this.resolveGroup(g)))
     return resolved.sort((a, b) => a.position - b.position)
   }
 
@@ -146,24 +146,18 @@ export class FormSchemaResolver {
 
   private async resolveFields(rawFields: RawField[]): Promise<FormField[]> {
     const filtered = rawFields.filter((f) => f.enabled ?? true)
-
-    const resolved = await Promise.all(
-      filtered.map((f) => this.resolveField(f))
-    )
-
+    const resolved = await Promise.all(filtered.map((f) => this.resolveField(f)))
     return resolved.sort((a, b) => a.position - b.position)
   }
 
   private async resolveField(raw: RawField): Promise<FormField> {
-    const fieldType = this.registry.getFieldType(raw.type)
+    const fieldType = this.config.registry.getFieldType(raw.type)
 
-    // Merge parameters: type defaults <- yaml overrides
     const parameters: Record<string, unknown> = {
       ...fieldType.getDefaultParameters(),
       ...(raw.parameters ?? {}),
     }
 
-    // Merge attributes: type defaults <- yaml overrides
     const typeAttrDefaults = fieldType.getDefaultAttributes()
     const yamlAttrs = raw.attributes ?? {}
 
@@ -182,19 +176,16 @@ export class FormSchemaResolver {
       actions: yamlAttrs.actions ?? {},
     }
 
-    // Apply context overrides
     if (this.state.context && attributes.actions[this.state.context]) {
       const override = attributes.actions[this.state.context]
       if (override.required !== undefined) attributes.required = override.required
       if (override.readonly !== undefined) attributes.readonly = override.readonly
     }
 
-    // Resolve options
-    const options = await this.resolveOptions(raw)
+    const { options, options_source } = await this.resolveOptions(raw)
 
-    // Validate interactions (warn on unknown, include all)
     const interactions = (raw.interactions ?? []).filter((i) => {
-      if (!this.registry.hasInteraction(i.action)) {
+      if (!this.config.registry.hasInteraction(i.action)) {
         console.warn(`[form-schema] Unknown interaction action "${i.action}" on field "${raw.tag}"`)
         return false
       }
@@ -217,43 +208,76 @@ export class FormSchemaResolver {
       default_value: fieldType.formatDefaultValue(raw.default_value),
       style: raw.style ?? [],
       options,
+      options_source,
       translations: raw.translations ?? {},
       interactions,
     }
   }
 
-  private async resolveOptions(raw: RawField): Promise<FieldOption[]> {
-    // Inline options defined directly in the YAML
+  private async resolveOptions(
+    raw: RawField,
+  ): Promise<{ options: FieldOption[]; options_source: ResolvedOptionsSource | null }> {
+    // Inline options — always pre-loaded
     if (raw.options && raw.options.length > 0) {
-      return raw.options.map((o, i) => ({
-        value: o.value,
-        text: o.label,
-        tag: o.tag ?? null,
-        icon: o.icon ?? null,
-        color: o.color ?? null,
-        position: o.position ?? i + 1,
-        data: o.data ?? {},
-      }))
-    }
-
-    // Options from a catalog source
-    if (raw.options_source) {
-      const source = this.registry.getOptionsSource(raw.options_source.type)
-      if (!source) {
-        console.warn(`[form-schema] Unknown options source type "${raw.options_source.type}" on field "${raw.tag}"`)
-        return []
+      return {
+        options: raw.options.map((o, i) => ({
+          value: o.value,
+          text: o.label,
+          tag: o.tag ?? null,
+          icon: o.icon ?? null,
+          color: o.color ?? null,
+          position: o.position ?? i + 1,
+          data: o.data ?? {},
+        })),
+        options_source: null,
       }
-      return source.resolve(raw.options_source.tag, this.baseUrl)
     }
 
-    return []
+    if (!raw.options_source) {
+      return { options: [], options_source: null }
+    }
+
+    const source = this.config.registry.getOptionsSource(raw.options_source.type)
+    if (!source) {
+      console.warn(`[form-schema] Unknown options source type "${raw.options_source.type}" on field "${raw.tag}"`)
+      return { options: [], options_source: null }
+    }
+
+    const externalConfig: ResolverExternalConfig = {
+      yamlBaseUrl: this.config.baseUrl,
+      repository: this.config.repository,
+      connections: this.config.connections,
+    }
+
+    const shouldPreLoad = source.isAlwaysPreLoad() || (raw.options_source.pre_load === true)
+
+    if (shouldPreLoad) {
+      const options = await source.resolve(raw.options_source, externalConfig)
+      return { options, options_source: null }
+    }
+
+    // Deferred — build the lazy descriptor for the renderer
+    if (!source.buildLazyOutput) {
+      console.warn(`[form-schema] Source "${raw.options_source.type}" does not support lazy loading. Falling back to pre-load.`)
+      const options = await source.resolve(raw.options_source, externalConfig)
+      return { options, options_source: null }
+    }
+
+    return {
+      options: [],
+      options_source: source.buildLazyOutput(raw.options_source, externalConfig),
+    }
   }
 
-  private resolveRender(level: 'form' | 'section' | 'group', type: string, yamlMetadata?: Record<string, unknown>): RenderConfig {
+  private resolveRender(
+    level: 'form' | 'section' | 'group',
+    type: string,
+    yamlMetadata?: Record<string, unknown>,
+  ): RenderConfig {
     const def =
-      level === 'form' ? this.registry.getFormRender(type) :
-      level === 'section' ? this.registry.getSectionRender(type) :
-      this.registry.getGroupRender(type)
+      level === 'form' ? this.config.registry.getFormRender(type) :
+      level === 'section' ? this.config.registry.getSectionRender(type) :
+      this.config.registry.getGroupRender(type)
 
     const defaultMeta = def?.getDefaultMetadata() ?? {}
     return {
@@ -270,9 +294,6 @@ export class FormSchemaResolver {
   }
 
   private clone(patch: Partial<ResolverState>): FormSchemaResolver {
-    return new FormSchemaResolver(
-      { registry: this.registry, baseUrl: this.baseUrl },
-      { ...this.state, ...patch },
-    )
+    return new FormSchemaResolver(this.config, { ...this.state, ...patch })
   }
 }

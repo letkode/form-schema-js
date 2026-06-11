@@ -348,6 +348,285 @@ const stringFt = customRegistry.getFieldType('string')
 assert(stringFt !== undefined, 'built-in string still accessible after custom registration')
 
 // ---------------------------------------------------------------------------
+// Test 14: normalizeApiResponse — value/label mapping + data merge
+// ---------------------------------------------------------------------------
+
+section('14. normalizeApiResponse — response mapping')
+
+const { normalizeApiResponse, RepositoryOptionsSource, ApiOptionsSource } = await import('./dist/index.js')
+
+// simple object, no existing data key
+const norm1 = normalizeApiResponse(
+  [{ uuid: '34ebefce', fullname: 'Juan Perez', active: true }],
+  'uuid', 'fullname',
+)
+assert(norm1[0].value === '34ebefce', 'norm1: value mapped from uuid')
+assert(norm1[0].text === 'Juan Perez', 'norm1: text mapped from fullname')
+assert(norm1[0].data.active === true, 'norm1: extra field goes into data')
+assert(!('fullname' in norm1[0].data), 'norm1: labelKey not duplicated in data')
+assert(!('uuid' in norm1[0].data), 'norm1: valueKey not duplicated in data')
+
+// object with existing data key — should merge
+const norm2 = normalizeApiResponse(
+  [{ uuid: '34ebefce', fullname: 'Juan Perez', active: true, data: { country: 've' } }],
+  'uuid', 'fullname',
+)
+assert(norm2[0].data.country === 've', 'norm2: existing data.country preserved')
+assert(norm2[0].data.active === true, 'norm2: extra field active merged into data')
+
+// default keys (value / label)
+const norm3 = normalizeApiResponse([{ value: 'us', label: 'United States', code: 'US' }])
+assert(norm3[0].value === 'us', 'norm3: default value_key works')
+assert(norm3[0].text === 'United States', 'norm3: default label_key works')
+assert(norm3[0].data.code === 'US', 'norm3: extra field goes to data with default keys')
+
+// ---------------------------------------------------------------------------
+// Test 15: RepositoryOptionsSource — lazy output (pre_load: false)
+// ---------------------------------------------------------------------------
+
+section('15. RepositoryOptionsSource — buildLazyOutput')
+
+const repoSrc = new RepositoryOptionsSource()
+
+// pathPattern with :class/:method placeholders + params → encoded URL
+const repoLazy = repoSrc.buildLazyOutput(
+  { type: 'repository', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false, value_key: 'uuid', label_key: 'name', params: { active: true } },
+  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+)
+assert(repoLazy.type === 'repository', 'repo lazy: type is repository')
+assert(repoLazy.url.startsWith('https://api.myapp.com/form-options/'), 'repo lazy: URL starts with baseUrl+pattern')
+assert(repoLazy.url.includes('active=true'), 'repo lazy: params appended as query string')
+assert(repoLazy.requires_auth === true, 'repo lazy: requires_auth true')
+assert(repoLazy.connection === null, 'repo lazy: connection null')
+assert(repoLazy.value_key === 'uuid', 'repo lazy: value_key preserved')
+assert(repoLazy.label_key === 'name', 'repo lazy: label_key preserved')
+
+// pathPattern without placeholders → class/method become query params
+const repoLazyNoSlot = repoSrc.buildLazyOutput(
+  { type: 'repository', class: 'app.hub.user_repository', method: 'find_active', params: { role: 'admin' } },
+  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options', getToken: () => 'tok' } },
+)
+assert(repoLazyNoSlot.url.includes('class=app.hub.user_repository'), 'repo no-slot: class as query param')
+assert(repoLazyNoSlot.url.includes('method=find_active'), 'repo no-slot: method as query param')
+assert(repoLazyNoSlot.url.includes('role=admin'), 'repo no-slot: extra params included')
+
+// ---------------------------------------------------------------------------
+// Test 16: RepositoryOptionsSource — resolver emits lazy options_source field
+// ---------------------------------------------------------------------------
+
+section('16. RepositoryOptionsSource — resolver integration (pre_load: false)')
+
+const origFetch = globalThis.fetch
+
+globalThis.fetch = async (input) => {
+  const url = String(input)
+  if (url.includes('/forms/')) {
+    return {
+      ok: true, status: 200,
+      text: async () => `
+tag: lazy_form
+name: Lazy Form
+sections:
+  - tag: s1
+    name: S1
+    position: 1
+    groups:
+      - tag: g1
+        name: G1
+        position: 1
+        fields:
+          - tag: category
+            name: Category
+            type: select
+            position: 1
+            options_source:
+              type: repository
+              class: app.hub.category_repository
+              method: find_for_form_option
+              pre_load: false
+              value_key: uuid
+              label_key: name
+              params:
+                active: true
+`,
+    }
+  }
+  const relativePath = url.slice(BASE_URL.length)
+  const filePath = resolve(YAML_BASE, '.' + relativePath)
+  try { return { ok: true, status: 200, text: async () => readFile(filePath, 'utf8').then(t => t) } }
+  catch { return { ok: false, status: 404, text: async () => '' } }
+}
+
+const { createFormSchemaResolver: mkResolver } = await import('./dist/index.js')
+
+const lazyResolver = mkResolver({
+  baseUrl: BASE_URL,
+  repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' },
+})
+const lazySchema = await lazyResolver.resolve('lazy_form')
+const lazyField = lazySchema.sections[0].groups[0].fields[0]
+
+assert(lazyField.options.length === 0, 'repo lazy resolver: options array is empty')
+assert(lazyField.options_source !== null, 'repo lazy resolver: options_source present')
+assert(lazyField.options_source.url.includes('/form-options/'), 'repo lazy resolver: URL contains pattern path')
+assert(lazyField.options_source.requires_auth === true, 'repo lazy resolver: requires_auth true')
+
+globalThis.fetch = origFetch
+
+// ---------------------------------------------------------------------------
+// Test 17: RepositoryOptionsSource — eager fetch (pre_load: true)
+// ---------------------------------------------------------------------------
+
+section('17. RepositoryOptionsSource — eager fetch (pre_load: true)')
+
+let eagerFetchCalled = false
+let eagerFetchUrl = ''
+let eagerFetchAuth = ''
+
+globalThis.fetch = async (input, init) => {
+  const url = String(input)
+  if (url.includes('/form-options/')) {
+    eagerFetchCalled = true
+    eagerFetchUrl = url
+    eagerFetchAuth = (init?.headers ?? {})['Authorization'] ?? ''
+    return {
+      ok: true, status: 200,
+      json: async () => [
+        { uuid: 'abc', name: 'Electronics', active: true },
+        { uuid: 'def', name: 'Clothing', active: false },
+      ],
+    }
+  }
+  if (url.includes('/forms/')) {
+    return {
+      ok: true, status: 200,
+      text: async () => `
+tag: eager_form
+name: Eager Form
+sections:
+  - tag: s1
+    name: S1
+    position: 1
+    groups:
+      - tag: g1
+        name: G1
+        position: 1
+        fields:
+          - tag: category
+            name: Category
+            type: select
+            position: 1
+            options_source:
+              type: repository
+              class: app.hub.category_repository
+              method: find_for_form_option
+              pre_load: true
+              value_key: uuid
+              label_key: name
+`,
+    }
+  }
+  const relativePath = url.slice(BASE_URL.length)
+  const filePath = resolve(YAML_BASE, '.' + relativePath)
+  try { return { ok: true, status: 200, text: async () => await readFile(filePath, 'utf8') } }
+  catch { return { ok: false, status: 404, text: async () => '' } }
+}
+
+const eagerResolver = mkResolver({
+  baseUrl: BASE_URL,
+  repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'my-jwt-token' },
+})
+const eagerSchema = await eagerResolver.resolve('eager_form')
+const eagerField = eagerSchema.sections[0].groups[0].fields[0]
+
+assert(eagerFetchCalled === true, 'repo eager: fetch was called')
+assert(eagerFetchUrl.includes('/form-options/app.hub.category_repository'), 'repo eager: correct URL called')
+assert(eagerFetchAuth === 'Bearer my-jwt-token', 'repo eager: Authorization header sent')
+assert(eagerField.options.length === 2, 'repo eager: 2 options inlined')
+assert(eagerField.options[0].value === 'abc', 'repo eager: value mapped from uuid')
+assert(eagerField.options[0].text === 'Electronics', 'repo eager: text mapped from name')
+assert(eagerField.options[0].data.active === true, 'repo eager: extra field in data')
+assert(eagerField.options_source === null, 'repo eager: options_source null when pre-loaded')
+
+globalThis.fetch = origFetch
+
+// ---------------------------------------------------------------------------
+// Test 18: ApiOptionsSource — buildLazyOutput
+// ---------------------------------------------------------------------------
+
+section('18. ApiOptionsSource — buildLazyOutput')
+
+const apiSrc = new ApiOptionsSource()
+
+const apiLazy = apiSrc.buildLazyOutput(
+  { type: 'api', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname', params: { active: true } },
+  { yamlBaseUrl: BASE_URL, connections: { crm: { baseUrl: 'https://crm.external.com', headers: { 'X-API-Key': 'secret' } } } },
+)
+assert(apiLazy.url === 'https://crm.external.com/v1/contacts', 'api lazy: baseUrl+endpoint resolved')
+assert(apiLazy.http_method === 'GET', 'api lazy: http_method preserved')
+assert(apiLazy.requires_auth === false, 'api lazy: requires_auth false')
+assert(apiLazy.connection === 'crm', 'api lazy: connection name in output')
+assert(apiLazy.params.active === true, 'api lazy: params preserved for renderer')
+assert(apiLazy.value_key === 'uuid', 'api lazy: value_key preserved')
+assert(apiLazy.label_key === 'fullname', 'api lazy: label_key preserved')
+
+// resolver integration
+globalThis.fetch = async (input) => {
+  const url = String(input)
+  if (url.includes('/forms/')) {
+    return {
+      ok: true, status: 200,
+      text: async () => `
+tag: api_form
+name: API Form
+sections:
+  - tag: s1
+    name: S1
+    position: 1
+    groups:
+      - tag: g1
+        name: G1
+        position: 1
+        fields:
+          - tag: contact
+            name: Contact
+            type: select
+            position: 1
+            options_source:
+              type: api
+              connection: crm
+              endpoint: /v1/contacts
+              http_method: GET
+              pre_load: false
+              value_key: uuid
+              label_key: fullname
+              params:
+                active: true
+`,
+    }
+  }
+  const relativePath = url.slice(BASE_URL.length)
+  const filePath = resolve(YAML_BASE, '.' + relativePath)
+  try { return { ok: true, status: 200, text: async () => await readFile(filePath, 'utf8') } }
+  catch { return { ok: false, status: 404, text: async () => '' } }
+}
+
+const apiResolver = mkResolver({
+  baseUrl: BASE_URL,
+  connections: { crm: { baseUrl: 'https://crm.external.com', headers: { 'X-API-Key': 'secret' } } },
+})
+const apiSchema = await apiResolver.resolve('api_form')
+const contactField = apiSchema.sections[0].groups[0].fields[0]
+
+assert(contactField.options.length === 0, 'api lazy resolver: options empty')
+assert(contactField.options_source !== null, 'api lazy resolver: options_source present')
+assert(contactField.options_source.url === 'https://crm.external.com/v1/contacts', 'api lazy resolver: URL correct')
+assert(contactField.options_source.connection === 'crm', 'api lazy resolver: connection name in output')
+assert(contactField.options_source.params.active === true, 'api lazy resolver: params in output')
+
+globalThis.fetch = origFetch
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 
