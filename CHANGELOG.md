@@ -35,5 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`UnknownFieldTypeError`** — thrown with a clear message listing all registered types
 - Dual ESM + CJS build output via `tsup`
 - Full TypeScript declarations (`.d.ts`)
-- Functional test suite (`test.mjs`) — 123 assertions covering all resolver features
+- **`CollectorFieldType`** — new `collector` type for repeatable sub-field collections; `parameters.fields` accepts a full field list that is resolved recursively using the same pipeline (FieldType defaults, attributes, options, interactions, translations all applied); default parameters: `layout: 'horizontal'`, `add_label: 'Add item'`, `fields: []`
+- Functional test suite (`test.mjs`) — 139 assertions covering all resolver features
 - Documentation in English (`README.md`) and Spanish (`README.es.md`)
