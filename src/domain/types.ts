@@ -25,6 +25,7 @@ export type FieldType =
   | 'tree'
   | 'rating'
   | 'file'
+  | 'collector'
 
 // ---------------------------------------------------------------------------
 // Interactions

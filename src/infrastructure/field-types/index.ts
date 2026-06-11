@@ -23,6 +23,7 @@ export { DuallistFieldType } from './DuallistFieldType.js'
 export { TreeFieldType } from './TreeFieldType.js'
 export { RatingFieldType } from './RatingFieldType.js'
 export { FileFieldType } from './FileFieldType.js'
+export { CollectorFieldType } from './CollectorFieldType.js'
 
 import { StringFieldType } from './StringFieldType.js'
 import { EmailFieldType } from './EmailFieldType.js'
@@ -46,6 +47,7 @@ import { DuallistFieldType } from './DuallistFieldType.js'
 import { TreeFieldType } from './TreeFieldType.js'
 import { RatingFieldType } from './RatingFieldType.js'
 import { FileFieldType } from './FileFieldType.js'
+import { CollectorFieldType } from './CollectorFieldType.js'
 import type { FieldTypeDefinition } from './AbstractFieldType.js'
 
 export const ALL_FIELD_TYPES: FieldTypeDefinition[] = [
@@ -71,4 +73,5 @@ export const ALL_FIELD_TYPES: FieldTypeDefinition[] = [
   new TreeFieldType(),
   new RatingFieldType(),
   new FileFieldType(),
+  new CollectorFieldType(),
 ]

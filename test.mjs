@@ -627,6 +627,92 @@ assert(contactField.options_source.params.active === true, 'api lazy resolver: p
 globalThis.fetch = origFetch
 
 // ---------------------------------------------------------------------------
+// Test 19: CollectorFieldType — recursive sub-field resolution
+// ---------------------------------------------------------------------------
+
+section('19. CollectorFieldType — recursive sub-field resolution')
+
+globalThis.fetch = async (input) => {
+  const url = String(input)
+  if (url.includes('/forms/')) {
+    return {
+      ok: true, status: 200,
+      text: async () => `
+tag: collector_form
+name: Collector Form
+sections:
+  - tag: s1
+    name: S1
+    position: 1
+    groups:
+      - tag: g1
+        name: G1
+        position: 1
+        fields:
+          - tag: experience_skills
+            name: Experiencia en conocimiento
+            type: collector
+            position: 1
+            style: [w-full]
+            attributes:
+              required: true
+            parameters:
+              layout: horizontal
+              add_label: Agregar habilidad
+              fields:
+                - tag: language
+                  name: Lenguaje
+                  type: string
+                  position: 1
+                  attributes:
+                    required: true
+                - tag: years
+                  name: Años de experiencia
+                  type: number
+                  position: 2
+                  default_value: 0
+            translations:
+              es:
+                name: Experiencia en conocimiento
+`,
+    }
+  }
+  const relativePath = url.slice(BASE_URL.length)
+  const filePath = resolve(YAML_BASE, '.' + relativePath)
+  try { return { ok: true, status: 200, text: async () => await readFile(filePath, 'utf8') } }
+  catch { return { ok: false, status: 404, text: async () => '' } }
+}
+
+const collectorResolver = mkResolver({ baseUrl: BASE_URL })
+const collectorSchema = await collectorResolver.resolve('collector_form')
+const collectorField = collectorSchema.sections[0].groups[0].fields[0]
+
+assert(collectorField.tag === 'experience_skills', 'collector: field tag correct')
+assert(collectorField.type === 'collector', 'collector: field type is collector')
+assert(collectorField.attributes.required === true, 'collector: required from YAML')
+assert(collectorField.parameters.layout === 'horizontal', 'collector: layout override from YAML')
+assert(collectorField.parameters.add_label === 'Agregar habilidad', 'collector: add_label from YAML')
+
+const subFields = collectorField.parameters.fields
+assert(Array.isArray(subFields), 'collector: parameters.fields is an array')
+assert(subFields.length === 2, 'collector: 2 sub-fields resolved')
+
+const langField = subFields[0]
+assert(langField.tag === 'language', 'collector: first sub-field tag is language')
+assert(langField.type === 'string', 'collector: first sub-field type is string')
+assert(langField.attributes.required === true, 'collector: sub-field required from YAML')
+assert(langField.parameters.max_length === 255, 'collector: sub-field gets StringFieldType defaults')
+assert(langField.parameters.label_style === 'default', 'collector: sub-field label_style default applied')
+
+const yearsField = subFields[1]
+assert(yearsField.tag === 'years', 'collector: second sub-field tag is years')
+assert(yearsField.type === 'number', 'collector: second sub-field type is number')
+assert(yearsField.default_value === 0, 'collector: sub-field default_value preserved')
+assert(yearsField.position === 2, 'collector: sub-fields sorted by position')
+
+globalThis.fetch = origFetch
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

@@ -158,6 +158,10 @@ export class FormSchemaResolver {
       ...(raw.parameters ?? {}),
     }
 
+    if (raw.type === 'collector' && Array.isArray(raw.parameters?.fields)) {
+      parameters.fields = await this.resolveFields(raw.parameters.fields as RawField[])
+    }
+
     const typeAttrDefaults = fieldType.getDefaultAttributes()
     const yamlAttrs = raw.attributes ?? {}
 
