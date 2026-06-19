@@ -57,11 +57,13 @@ export interface FieldInteraction {
 export interface FieldOption {
   value: string | number
   text: string
+  description: string | null
   tag: string | null
   icon: string | null
   color: string | null
   position: number
   data: Record<string, unknown>
+  translations: Record<string, Partial<{ text: string; description: string }>>
 }
 
 export interface FieldOptionGroup {
@@ -88,6 +90,8 @@ export interface ResolvedOptionsSource {
   value_key: string
   /** Key in the API response object to use as option label/text */
   label_key: string
+  /** Active locale — renderer may forward it to the backend (e.g. as Accept-Language or query param) */
+  locale: string
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +197,9 @@ export interface FormSchema {
   sections: FormSection[]
 }
 
+/** All fields in a form indexed by their tag. Collector sub-fields are included as top-level entries. */
+export type FormFieldMap = Record<string, FormField>
+
 // ---------------------------------------------------------------------------
 // Raw YAML shapes (what's parsed before resolution)
 // ---------------------------------------------------------------------------
@@ -200,11 +207,13 @@ export interface FormSchema {
 export interface RawOptionValue {
   value: string | number
   label: string
+  description?: string | null
   tag?: string | null
   icon?: string | null
   color?: string | null
   position?: number
   data?: Record<string, unknown>
+  translations?: Record<string, Partial<{ label: string; description: string }>>
 }
 
 export interface RawOptionsFile {
@@ -327,6 +336,7 @@ export interface ConnectionConfig {
 
 export interface ResolverExternalConfig {
   yamlBaseUrl: string
+  locale: string
   repository?: RepositoryConfig
   connections?: Record<string, ConnectionConfig>
 }

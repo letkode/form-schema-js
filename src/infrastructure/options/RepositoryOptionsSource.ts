@@ -44,6 +44,7 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
       params: {},  // already encoded in the URL
       value_key: source.value_key ?? 'value',
       label_key: source.label_key ?? 'label',
+      locale: config.locale,
     }
   }
 

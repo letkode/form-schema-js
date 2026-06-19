@@ -2,6 +2,7 @@ import { YamlLoader } from '../loader/YamlLoader.js'
 import { FormSchemaRegistry } from '../registry/FormSchemaRegistry.js'
 import type {
   FormSchema,
+  FormFieldMap,
   FormSection,
   FormGroup,
   FormField,
@@ -63,6 +64,30 @@ export class FormSchemaResolver {
   async resolve(formTag: string): Promise<FormSchema> {
     const raw = await YamlLoader.loadForm(this.config.baseUrl, formTag)
     return this.resolveForm(raw)
+  }
+
+  async resolveFieldMap(formTag: string): Promise<FormFieldMap> {
+    const schema = await this.resolve(formTag)
+    return this.extractFieldMap(schema)
+  }
+
+  private extractFieldMap(schema: FormSchema): FormFieldMap {
+    const map: FormFieldMap = {}
+    for (const section of schema.sections) {
+      for (const group of section.groups) {
+        this.collectFields(group.fields, map)
+      }
+    }
+    return map
+  }
+
+  private collectFields(fields: FormField[], map: FormFieldMap): void {
+    for (const field of fields) {
+      map[field.tag] = field
+      if (field.type === 'collector' && Array.isArray(field.parameters.fields)) {
+        this.collectFields(field.parameters.fields as FormField[], map)
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -224,15 +249,20 @@ export class FormSchemaResolver {
     // Inline options — always pre-loaded
     if (raw.options && raw.options.length > 0) {
       return {
-        options: raw.options.map((o, i) => ({
-          value: o.value,
-          text: o.label,
-          tag: o.tag ?? null,
-          icon: o.icon ?? null,
-          color: o.color ?? null,
-          position: o.position ?? i + 1,
-          data: o.data ?? {},
-        })),
+        options: raw.options.map((o, i) => {
+          const t = o.translations?.[this.state.locale] ?? {}
+          return {
+            value: o.value,
+            text: t.label ?? o.label,
+            description: t.description ?? o.description ?? null,
+            tag: o.tag ?? null,
+            icon: o.icon ?? null,
+            color: o.color ?? null,
+            position: o.position ?? i + 1,
+            data: o.data ?? {},
+            translations: this.normalizeOptionTranslations(o.translations),
+          }
+        }),
         options_source: null,
       }
     }
@@ -249,6 +279,7 @@ export class FormSchemaResolver {
 
     const externalConfig: ResolverExternalConfig = {
       yamlBaseUrl: this.config.baseUrl,
+      locale: this.state.locale,
       repository: this.config.repository,
       connections: this.config.connections,
     }
@@ -295,6 +326,20 @@ export class FormSchemaResolver {
   ): Partial<{ name: string; description: string; placeholder: string }> {
     if (!translations || !this.state.locale) return {}
     return translations[this.state.locale] ?? {}
+  }
+
+  private normalizeOptionTranslations(
+    raw: Record<string, Partial<{ label: string; description: string }>> | undefined,
+  ): Record<string, Partial<{ text: string; description: string }>> {
+    if (!raw) return {}
+    return Object.fromEntries(
+      Object.entries(raw).map(([locale, t]) => {
+        const entry: Partial<{ text: string; description: string }> = {}
+        if (t.label !== undefined) entry.text = t.label
+        if (t.description !== undefined) entry.description = t.description
+        return [locale, entry]
+      }),
+    )
   }
 
   private clone(patch: Partial<ResolverState>): FormSchemaResolver {

@@ -37,6 +37,7 @@ export class ApiOptionsSource implements OptionsSourceDefinition {
       params: source.params ?? {},
       value_key: source.value_key ?? 'value',
       label_key: source.label_key ?? 'label',
+      locale: config.locale,
     }
   }
 

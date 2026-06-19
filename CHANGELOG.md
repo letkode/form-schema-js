@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-06-19
+
+### Added
+
+- **`description` field on `FieldOption`** — options now carry an optional description string (`string | null`), resolved from YAML or API responses
+- **`translations` field on `FieldOption`** — each option exposes its full translations map (`Record<string, Partial<{ text: string; description: string }>>`) so renderers can switch locale without re-fetching
+- **Option locale resolution** — inline options and `YamlCatalogSource` now apply `translations[locale]` at resolve time (both `label` → `text` and `description`); the active locale is picked from `withLocale()` on the resolver
+- **`locale` on `ResolvedOptionsSource`** — lazy options sources (`repository`, `api`) now include the active locale in their descriptor so renderers can forward it to the backend (e.g. as `Accept-Language` or a query param)
+- **`locale` on `ResolverExternalConfig`** — internal config struct now carries the active locale for options source implementations
+- **`FormFieldMap` type** — `Record<string, FormField>` — a flat index of all fields in a form keyed by tag; collector sub-fields are included as top-level entries
+- **`resolveFieldMap(formTag)`** — new public method on `FormSchemaResolver` that resolves a form and returns a `FormFieldMap` for quick tag-based field lookup
+- **`description` in `normalizeApiResponse()`** — the utility now maps a `description` key from API rows into `FieldOption.description`; also initialises `translations: {}` on every returned option
+
+---
+
 ## [1.0.0] - 2026-06-11
 
 ### Added
