@@ -402,6 +402,72 @@ Cuando un contexto está activo, los overrides de `attributes.actions[context]` 
 
 ---
 
+## Overlays por scope
+
+`withContext()` sirve para variar atributos como `required`/`readonly` dentro del mismo archivo. Cuando un formulario necesita una forma genuinamente distinta según un scope de nivel plataforma — por ejemplo un despliegue hub vs. tenant, o cualquier otra separación multi-entorno — usa `withScope(scope)` en su lugar. Este método superpone un **archivo YAML de overlay** opcional sobre el archivo base, fusionándolo (deep-merge) por `tag` en cada nivel (sections → groups → fields, incluyendo `parameters.fields` de collectors).
+
+Dado un formulario base:
+
+```yaml
+# forms/user-form.yaml
+tag: user-form
+sections:
+  - tag: user_info
+    groups:
+      - tag: basic_data
+        fields:
+          - tag: rolePolicies
+            name: Roles
+            type: select-multiple
+            options_source:
+              type: repository
+              class: hub-role-policy-provider
+              method: active-options
+              value_key: id
+              label_key: name
+```
+
+Un archivo overlay solo necesita repetir los tags necesarios para llegar a lo que cambia:
+
+```yaml
+# forms/user-form.tenant.yaml
+tag: user-form
+sections:
+  - tag: user_info
+    groups:
+      - tag: basic_data
+        fields:
+          - tag: rolePolicies
+            options_source:
+              class: tenant-role-policy-provider
+```
+
+```ts
+// Hub — no existe archivo overlay para "hub", resuelve el formulario base sin cambios
+resolver.withScope('hub').resolve('user-form')
+
+// Tenant — user-form.tenant.yaml se fusiona sobre el base:
+// rolePolicies.options_source.class pasa a ser "tenant-role-policy-provider",
+// todo lo demás de ese campo (method, value_key, label_key, name, type...) se hereda
+resolver.withScope('tenant').resolve('user-form')
+
+// Nunca llamar a withScope() evita por completo el fetch del overlay —
+// comportamiento/tráfico de red idéntico a versiones anteriores a la 1.2.0
+resolver.resolve('user-form')
+```
+
+**Reglas de fusión:**
+
+- Sections, groups, fields y `parameters.fields` de collectors se emparejan por `tag` en cada nivel. Un item del overlay que matchea se fusiona (deep-merge) sobre el item base; uno que no matchea se **agrega** (un campo/grupo/section nuevo, presente solo en ese scope).
+- Las claves escalares de un item matcheado (`name`, `type`, `description`, `position`, `placeholder`, `default_value`, `enabled`, `interactions`) se sobrescriben solo donde el overlay las define explícitamente — lo que el overlay omite se hereda del base.
+- `attributes`, `parameters`, `options_source` y `translations` se fusionan un nivel de profundidad, así un overlay puede cambiar un solo leaf (por ejemplo `options_source.class`) sin repetir sus hermanos.
+- `style` y las `options` inline se **reemplazan completas** cuando el overlay las define — nunca se fusionan elemento por elemento.
+- Poner `enabled: false` en un item del overlay oculta ese item para el scope — reutiliza el filtro `enabled ?? true` ya existente, no hay un flag separado de "remove".
+- `position` es un leaf escalar más — un overlay puede reordenar campos para un scope seteando `position` solo en los campos que se mueven; la resolución sigue ordenando por `position` después del merge, no hace falta ningún paso extra.
+- Un archivo overlay faltante (HTTP 404) no es un error — el formulario se resuelve como si `withScope()` nunca se hubiera llamado para ese tag.
+
+---
+
 ## Extensibilidad
 
 El `FormSchemaRegistry` es el contenedor de todas las definiciones. Viene pre-cargado con todos los tipos integrados. Puedes agregar los tuyos en cualquier nivel:
@@ -540,6 +606,7 @@ Builder fluido inmutable. Cada método retorna una **nueva instancia** — el or
 |---|---|
 | `.withLocale(locale: string)` | Define el locale para resolución de traducciones |
 | `.withContext(context: string)` | Activa un contexto para aplicar overrides de `attributes.actions[context]` |
+| `.withScope(scope: string)` | Activa la resolución de overlays por scope; intenta cargar `{tag}.{scope}.yaml` y lo fusiona sobre el archivo base por `tag` (ver [Overlays por scope](#overlays-por-scope)) |
 | `.includingSections(tags: string[])` | Solo incluye secciones con estos tags |
 | `.excludingSections(tags: string[])` | Excluye secciones con estos tags |
 | `.resolve(formTag: string)` | Descarga, parsea y resuelve el YAML — retorna `Promise<FormSchema>` |

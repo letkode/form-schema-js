@@ -713,6 +713,45 @@ assert(yearsField.position === 2, 'collector: sub-fields sorted by position')
 globalThis.fetch = origFetch
 
 // ---------------------------------------------------------------------------
+// Test 20: Scope overlays — withScope()
+// ---------------------------------------------------------------------------
+
+section('20. Scope overlays — withScope()')
+
+const overlayResolver = createFormSchemaResolver({
+  baseUrl: BASE_URL,
+  repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' },
+})
+
+const tenantSchema = await overlayResolver.withScope('tenant').resolve('overlay-demo')
+const tenantFields = tenantSchema.sections[0].groups[0].fields
+
+const keepTenant = tenantFields.find(f => f.tag === 'keep')
+assert(keepTenant !== undefined, 'scope overlay: untouched field "keep" is inherited from base')
+
+const swapTenant = tenantFields.find(f => f.tag === 'swap')
+assert(swapTenant.options_source.url.includes('tenant-provider'), 'scope overlay: options_source.class overridden to tenant-provider (leaf merge)')
+
+const hideMeTenant = tenantFields.find(f => f.tag === 'hideMe')
+assert(hideMeTenant === undefined, 'scope overlay: field hidden via enabled: false in overlay')
+
+const tenantOnly = tenantFields.find(f => f.tag === 'tenantOnly')
+assert(tenantOnly !== undefined, 'scope overlay: new field appended by overlay is present')
+
+// no overlay file exists for "hub" — must fall back to the base form unchanged
+const hubSchema = await overlayResolver.withScope('hub').resolve('overlay-demo')
+const hubFields = hubSchema.sections[0].groups[0].fields
+assert(hubFields.find(f => f.tag === 'hideMe') !== undefined, 'scope overlay: no overlay file (404) falls back to base — hideMe still present')
+assert(hubFields.find(f => f.tag === 'tenantOnly') === undefined, 'scope overlay: no overlay file (404) falls back to base — tenantOnly absent')
+assert(hubFields.find(f => f.tag === 'swap').options_source.url.includes('base-provider'), 'scope overlay: no overlay file (404) falls back to base — swap keeps base-provider')
+
+// withScope() never called at all — identical to pre-1.2 behavior, no overlay fetch attempted
+const defaultSchema = await overlayResolver.resolve('overlay-demo')
+const defaultFields = defaultSchema.sections[0].groups[0].fields
+assert(defaultFields.find(f => f.tag === 'hideMe') !== undefined, 'scope overlay: withScope() never called — behaves like base-only form')
+assert(defaultFields.length === 3, 'scope overlay: withScope() never called — field count matches base (3)')
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

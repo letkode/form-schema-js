@@ -1,5 +1,6 @@
 import { YamlLoader } from '../loader/YamlLoader.js'
 import { FormSchemaRegistry } from '../registry/FormSchemaRegistry.js'
+import { mergeRawForm } from '../merger/RawFormMerger.js'
 import type {
   FormSchema,
   FormFieldMap,
@@ -32,6 +33,7 @@ export interface ResolverConfig {
 interface ResolverState {
   locale: string
   context: string | null
+  scope: string | null
   includeSections: string[] | null
   excludeSections: string[] | null
 }
@@ -42,7 +44,7 @@ export class FormSchemaResolver {
 
   constructor(config: ResolverConfig, state?: ResolverState) {
     this.config = { ...config, baseUrl: config.baseUrl.replace(/\/$/, '') }
-    this.state = state ?? { locale: 'en', context: null, includeSections: null, excludeSections: null }
+    this.state = state ?? { locale: 'en', context: null, scope: null, includeSections: null, excludeSections: null }
   }
 
   withLocale(locale: string): FormSchemaResolver {
@@ -51,6 +53,17 @@ export class FormSchemaResolver {
 
   withContext(context: string): FormSchemaResolver {
     return this.clone({ context })
+  }
+
+  /**
+   * Opts into scope-based overlay resolution. When set, `resolve()` additionally
+   * attempts to load `{tag}.{scope}.yaml` and deep-merges it onto the base file by
+   * matching `tag` at each level (sections → groups → fields). A missing overlay
+   * file (404) is not an error — the base form resolves unchanged. Never calling
+   * `withScope()` skips the overlay fetch entirely (identical to pre-1.2 behavior).
+   */
+  withScope(scope: string): FormSchemaResolver {
+    return this.clone({ scope })
   }
 
   includingSections(tags: string[]): FormSchemaResolver {
@@ -63,7 +76,11 @@ export class FormSchemaResolver {
 
   async resolve(formTag: string): Promise<FormSchema> {
     const raw = await YamlLoader.loadForm(this.config.baseUrl, formTag)
-    return this.resolveForm(raw)
+    if (!this.state.scope) {
+      return this.resolveForm(raw)
+    }
+    const overlay = await YamlLoader.loadOverlay(this.config.baseUrl, formTag, this.state.scope)
+    return this.resolveForm(overlay ? mergeRawForm(raw, overlay) : raw)
   }
 
   async resolveFieldMap(formTag: string): Promise<FormFieldMap> {

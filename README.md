@@ -402,6 +402,72 @@ When a context is active, `attributes.actions[context]` overrides are merged int
 
 ---
 
+## Scope overlays
+
+`withContext()` is for varying attributes like `required`/`readonly` within the same file. When a form needs a genuinely different shape depending on a platform-level scope — e.g. a hub vs. tenant deployment, or any other multi-environment split — use `withScope(scope)` instead. It layers an optional **overlay YAML file** on top of the base file, deep-merging by `tag` at every level (sections → groups → fields, including collector `parameters.fields`).
+
+Given a base form:
+
+```yaml
+# forms/user-form.yaml
+tag: user-form
+sections:
+  - tag: user_info
+    groups:
+      - tag: basic_data
+        fields:
+          - tag: rolePolicies
+            name: Roles
+            type: select-multiple
+            options_source:
+              type: repository
+              class: hub-role-policy-provider
+              method: active-options
+              value_key: id
+              label_key: name
+```
+
+An overlay file only needs to repeat the tags required to path down to what changes:
+
+```yaml
+# forms/user-form.tenant.yaml
+tag: user-form
+sections:
+  - tag: user_info
+    groups:
+      - tag: basic_data
+        fields:
+          - tag: rolePolicies
+            options_source:
+              class: tenant-role-policy-provider
+```
+
+```ts
+// Hub — no overlay file exists for "hub", resolves the base form unchanged
+resolver.withScope('hub').resolve('user-form')
+
+// Tenant — user-form.tenant.yaml is merged onto the base:
+// rolePolicies.options_source.class becomes "tenant-role-policy-provider",
+// everything else on that field (method, value_key, label_key, name, type...) is inherited
+resolver.withScope('tenant').resolve('user-form')
+
+// Never calling withScope() at all skips the overlay fetch entirely —
+// identical behavior/network activity to versions before 1.2.0
+resolver.resolve('user-form')
+```
+
+**Merge rules:**
+
+- Sections, groups, fields, and collector `parameters.fields` are matched by `tag` at each level. A matching overlay item deep-merges onto the base item; a non-matching overlay item is **appended** (a new field/group/section only present in that scope).
+- Scalar leaves on a matched item (`name`, `type`, `description`, `position`, `placeholder`, `default_value`, `enabled`, `interactions`) are overwritten only where the overlay explicitly sets them — anything the overlay omits is inherited from the base.
+- `attributes`, `parameters`, `options_source`, and `translations` merge one level deep, so an overlay can change a single leaf (e.g. just `options_source.class`) without repeating its siblings.
+- `style` and inline `options` arrays are **replaced wholesale** when the overlay sets them — never merged element by element.
+- Setting `enabled: false` on an overlay item hides that item for the scope — this reuses the existing `enabled ?? true` filter, there is no separate "remove" flag.
+- `position` is a plain scalar leaf like any other — an overlay can reorder fields for a scope by only setting `position` on the fields that move; resolution still sorts by `position` after the merge, so no extra step is needed.
+- A missing overlay file (HTTP 404) is not an error — the form resolves as if `withScope()` had never been called for that tag.
+
+---
+
 ## Extensibility
 
 The `FormSchemaRegistry` is the container for all definitions. It is pre-populated with every built-in type. You can add your own at any level:
@@ -540,6 +606,7 @@ Immutable fluent builder. Each method returns a **new instance** — the origina
 |---|---|
 | `.withLocale(locale: string)` | Set the locale for translation resolution |
 | `.withContext(context: string)` | Activate a context to apply `attributes.actions[context]` overrides |
+| `.withScope(scope: string)` | Activate scope-based overlay resolution; attempts to load `{tag}.{scope}.yaml` and deep-merges it onto the base file by `tag` (see [Scope overlays](#scope-overlays)) |
 | `.includingSections(tags: string[])` | Only include sections with these tags |
 | `.excludingSections(tags: string[])` | Exclude sections with these tags |
 | `.resolve(formTag: string)` | Fetch, parse, and resolve the YAML — returns `Promise<FormSchema>` |

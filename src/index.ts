@@ -6,6 +6,7 @@ export { FormSchemaResolver } from './application/resolver/FormSchemaResolver.js
 export type { ResolverConfig } from './application/resolver/FormSchemaResolver.js'
 export { FormSchemaRegistry, UnknownFieldTypeError } from './application/registry/FormSchemaRegistry.js'
 export { YamlLoader } from './application/loader/YamlLoader.js'
+export { mergeRawForm } from './application/merger/RawFormMerger.js'
 
 // Infrastructure — field types
 export * from './infrastructure/field-types/index.js'

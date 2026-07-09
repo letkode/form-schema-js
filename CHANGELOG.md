@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-07-09
+
+### Added
+
+- **`withScope(scope)`** — new resolver chain method to opt into hub/tenant-style overlay resolution; scope is open-ended (`string`), mirrors `withContext()`
+- **Scope overlay YAML files** — when `withScope(scope)` is set, `resolve()` additionally attempts to load `{baseUrl}/forms/{tag}.{scope}.yaml`; a 404 is treated as "no overlay for this scope" (not an error), so base-only forms keep working with zero overlay files present
+- **`YamlLoader.loadOverlay(baseUrl, tag, scope)`** — non-throwing variant of `loadForm()` used for optional overlay files; returns `null` on 404, still throws on other HTTP errors
+- **`mergeRawForm()`** (new `RawFormMerger` module) — pure, unit-testable function that deep-merges an overlay `RawFormFile` onto a base `RawFormFile`, matching sections, groups, fields, and collector `parameters.fields` by `tag`; matched items merge leaf-by-leaf (including one-level-deep merges of `attributes`, `parameters`, `options_source`, `translations`), unmatched overlay items are appended, and `enabled: false` on an overlay item hides the corresponding base item for that scope
+
+### Notes
+
+- Fully backward compatible: `resolve()` only attempts to load an overlay file when `withScope()` has been called on the chain; existing consumers see no behavior change and no new network requests
+- `style` and inline `options` arrays are replaced wholesale by the overlay when present, never merged element by element
+- `position` is a plain scalar leaf like any other field property, so an overlay can reorder fields for a given scope by only setting `position` on the fields that need to move
+- Merge semantics documented in README — see "Scope overlays" section
+
+---
+
 ## [1.1.0] - 2026-06-19
 
 ### Added
