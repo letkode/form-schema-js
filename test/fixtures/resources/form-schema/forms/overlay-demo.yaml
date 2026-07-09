@@ -1,0 +1,34 @@
+tag: overlay-demo
+name: Overlay Demo
+enabled: true
+
+sections:
+  - tag: main
+    name: Main
+    position: 1
+    groups:
+      - tag: fields
+        name: Fields
+        position: 1
+        fields:
+          - tag: keep
+            name: Keep
+            type: string
+            position: 1
+
+          - tag: swap
+            name: Swap
+            type: select-multiple
+            position: 2
+            options_source:
+              type: repository
+              class: base-provider
+              method: options
+              value_key: id
+              label_key: name
+
+          - tag: hideMe
+            name: Hide Me
+            type: string
+            position: 3
+            enabled: true

@@ -1,0 +1,17 @@
+tag: overlay-demo
+sections:
+  - tag: main
+    groups:
+      - tag: fields
+        fields:
+          - tag: swap
+            options_source:
+              class: tenant-provider
+
+          - tag: hideMe
+            enabled: false
+
+          - tag: tenantOnly
+            name: Tenant Only
+            type: string
+            position: 4

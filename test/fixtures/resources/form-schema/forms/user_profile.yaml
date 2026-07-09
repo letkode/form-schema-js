@@ -1,0 +1,91 @@
+tag: user_profile
+name: User Profile
+enabled: true
+default_locale: en
+render:
+  type: stepper
+  metadata:
+    show_progress: true
+    persist_on_navigate: true
+
+sections:
+  - tag: personal_data
+    name: Personal Data
+    position: 1
+    render:
+      type: accordion
+      metadata:
+        allow_multiple_open: false
+        first_open: true
+    translations:
+      es:
+        name: Datos Personales
+    groups:
+      - tag: basic_info
+        name: Basic Info
+        position: 1
+        render:
+          type: fieldset
+          metadata:
+            legend: true
+        fields:
+          - tag: first_name
+            name: First Name
+            type: string
+            position: 1
+            style: [w-1/2]
+            attributes:
+              required: true
+              actions:
+                show:
+                  readonly: true
+            translations:
+              es:
+                name: Nombre
+                placeholder: Ingresa tu nombre
+
+          - tag: country
+            name: Country
+            type: select
+            position: 2
+            options_source:
+              type: catalog
+              tag: countries
+
+  - tag: account_settings
+    name: Account Settings
+    position: 2
+    groups:
+      - tag: credentials
+        name: Credentials
+        position: 1
+        fields:
+          - tag: password
+            name: Password
+            type: password
+            position: 1
+            attributes:
+              required: true
+              actions:
+                edit:
+                  required: false
+
+      - tag: permissions
+        name: Permissions
+        position: 2
+        fields:
+          - tag: role
+            name: Role
+            type: radio
+            position: 1
+            parameters:
+              layout: horizontal
+            options_source:
+              type: catalog
+              tag: roles
+
+          - tag: is_active
+            name: Is Active
+            type: switch
+            position: 2
+            default_value: true

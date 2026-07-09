@@ -1,0 +1,28 @@
+tag: countries
+name: Countries
+values:
+  - value: us
+    label: United States
+    position: 1
+    data:
+      country_code: US
+  - value: es
+    label: España
+    position: 2
+    data:
+      country_code: ES
+  - value: mx
+    label: México
+    position: 3
+    data:
+      country_code: MX
+  - value: co
+    label: Colombia
+    position: 4
+    data:
+      country_code: CO
+  - value: ar
+    label: Argentina
+    position: 5
+    data:
+      country_code: AR

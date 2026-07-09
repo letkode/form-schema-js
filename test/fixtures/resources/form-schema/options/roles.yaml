@@ -1,0 +1,21 @@
+tag: roles
+name: User Roles
+values:
+  - value: admin
+    label: Administrator
+    position: 1
+    icon: shield
+    color: '#ef4444'
+    data: {}
+  - value: editor
+    label: Editor
+    position: 2
+    icon: pencil
+    color: '#3b82f6'
+    data: {}
+  - value: viewer
+    label: Viewer
+    position: 3
+    icon: eye
+    color: '#10b981'
+    data: {}

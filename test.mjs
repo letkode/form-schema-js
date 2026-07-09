@@ -9,7 +9,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dir = dirname(fileURLToPath(import.meta.url))
-const YAML_BASE = resolve(__dir, '../../../lka-react-ui-base/public/resources/form-schema')
+const YAML_BASE = resolve(__dir, 'test/fixtures/resources/form-schema')
 
 // ---------------------------------------------------------------------------
 // Mock fetch — maps URLs to filesystem reads
