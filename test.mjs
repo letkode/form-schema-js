@@ -551,6 +551,70 @@ assert(eagerField.options_source === null, 'repo eager: options_source null when
 globalThis.fetch = origFetch
 
 // ---------------------------------------------------------------------------
+// Test 17b: RepositoryOptionsSource — getHeaders() merged into eager fetch
+// ---------------------------------------------------------------------------
+
+section('17b. RepositoryOptionsSource — repository.getHeaders()')
+
+let headersSeen = {}
+
+globalThis.fetch = async (input, init) => {
+  const url = String(input)
+  if (url.includes('/form-options/')) {
+    headersSeen = init?.headers ?? {}
+    return { ok: true, status: 200, json: async () => [{ uuid: 'abc', name: 'Electronics' }] }
+  }
+  if (url.includes('/forms/')) {
+    return {
+      ok: true, status: 200,
+      text: async () => `
+tag: headers_form
+name: Headers Form
+sections:
+  - tag: s1
+    name: S1
+    position: 1
+    groups:
+      - tag: g1
+        name: G1
+        position: 1
+        fields:
+          - tag: category
+            name: Category
+            type: select
+            position: 1
+            options_source:
+              type: repository
+              class: app.hub.category_repository
+              method: find_for_form_option
+              pre_load: true
+              value_key: uuid
+              label_key: name
+`,
+    }
+  }
+  return { ok: false, status: 404, text: async () => '' }
+}
+
+const headersResolver = mkResolver({
+  baseUrl: BASE_URL,
+  repository: {
+    baseUrl: 'https://api.myapp.com',
+    pathPattern: '/form-options/:class/:method',
+    getToken: () => 'my-jwt-token',
+    getHeaders: () => ({ 'X-Tenant-Schema': 'acme', 'X-Identity-Type': 'default' }),
+  },
+})
+await headersResolver.resolve('headers_form')
+
+assert(headersSeen['X-Tenant-Schema'] === 'acme', 'repo getHeaders: X-Tenant-Schema sent')
+assert(headersSeen['X-Identity-Type'] === 'default', 'repo getHeaders: X-Identity-Type sent')
+assert(headersSeen['Authorization'] === 'Bearer my-jwt-token', 'repo getHeaders: Authorization still sent alongside custom headers')
+assert(headersSeen['Content-Type'] === 'application/json', 'repo getHeaders: Content-Type still present')
+
+globalThis.fetch = origFetch
+
+// ---------------------------------------------------------------------------
 // Test 18: ApiOptionsSource — buildLazyOutput
 // ---------------------------------------------------------------------------
 

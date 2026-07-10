@@ -59,6 +59,7 @@ export interface CreateResolverConfig {
  *     baseUrl: import.meta.env.VITE_API_URL,
  *     pathPattern: '/form-options/:class/:method',
  *     getToken: () => localStorage.getItem('token'),
+ *     getHeaders: () => yourApp.getExtraHeaders(), // whatever headers your backend needs — entirely up to your app
  *   },
  *   connections: {
  *     crm: {

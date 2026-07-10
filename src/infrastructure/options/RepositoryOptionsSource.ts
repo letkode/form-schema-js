@@ -19,7 +19,10 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
     const url = this.buildUrl(source, config.repository)
     const token = config.repository.getToken?.()
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(config.repository.getHeaders?.() ?? {}),
+    }
     if (token) headers['Authorization'] = `Bearer ${token}`
 
     const response = await fetch(url, { method: 'GET', headers })

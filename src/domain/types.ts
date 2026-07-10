@@ -325,6 +325,13 @@ export interface RepositoryConfig {
   pathPattern: string
   /** Returns the current user's JWT token to attach as Authorization header */
   getToken?: () => string | null
+  /**
+   * Returns extra headers to send on every repository request (e.g. tenant
+   * schema or active-identity headers required by multi-tenant backends).
+   * Called fresh on each request, so it can reflect state that changes at
+   * runtime (like the active identity). Merged before `Authorization`.
+   */
+  getHeaders?: () => Record<string, string>
 }
 
 export interface ConnectionConfig {

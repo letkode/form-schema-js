@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-07-10
+
+### Added
+
+- **`RepositoryConfig.getHeaders()`** — new optional function returning extra headers to send on every `options_source: { type: repository }` request (e.g. `X-Tenant-Schema`, `X-Identity-Type`, or any other multi-tenant/identity header a backend requires). Called fresh on each request, merged into the request headers before `Authorization`.
+
+### Fixed
+
+- `RepositoryOptionsSource.resolve()` (the eager `pre_load: true` path) previously only sent `Content-Type` and `Authorization`, bypassing any app-level headers a backend might require beyond the JWT — causing 401s on multi-tenant backends that need a tenant/identity header on every request. `getHeaders()` closes that gap.
+
+### Notes
+
+- `buildLazyOutput()` (the deferred `pre_load: false` path) is untouched — no consumer resolves `ResolvedOptionsSource` client-side yet, so there was nothing to fix there.
+
+---
+
 ## [1.2.0] - 2026-07-09
 
 ### Added
