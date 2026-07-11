@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.1] - 2026-07-11
+
+### Fixed
+
+- **`normalizeApiResponse()`** — `translations` is now a recognized top-level key on API response items. Previously it wasn't in the known-keys list, so any `translations` field sent by a `repository`/`api` options source backend was swept into `option.data.translations` instead of `option.data`, and the resolved `option.translations` was always hardcoded to `{}` regardless of what the API sent. Now a `translations` object on the API item is assigned directly to `option.translations` (unset defaults to `{}` as before, so backends that don't send it see no change).
+
+---
+
 ## [1.4.0] - 2026-07-11
 
 ### Added

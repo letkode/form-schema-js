@@ -1,6 +1,6 @@
 {
   "name": "@letkode/form-schema",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "YAML-driven form schema resolver — produces FormSchema JSON for any form renderer",
   "license": "MIT",
   "keywords": [

@@ -25,7 +25,7 @@ export function normalizeApiResponse(
     const text = String(item[labelKey] ?? '')
 
     // Known FieldOption top-level fields that should not go into data
-    const knownKeys = new Set([valueKey, labelKey, 'description', 'tag', 'icon', 'color', 'position', 'data'])
+    const knownKeys = new Set([valueKey, labelKey, 'description', 'tag', 'icon', 'color', 'position', 'data', 'translations'])
 
     const existingData = (typeof item['data'] === 'object' && item['data'] !== null)
       ? (item['data'] as Record<string, unknown>)
@@ -36,6 +36,10 @@ export function normalizeApiResponse(
       if (!knownKeys.has(k)) rest[k] = v
     }
 
+    const translations = (typeof item['translations'] === 'object' && item['translations'] !== null)
+      ? (item['translations'] as FieldOption['translations'])
+      : {}
+
     return {
       value,
       text,
@@ -45,7 +49,7 @@ export function normalizeApiResponse(
       color: (item['color'] as string | null) ?? null,
       position: typeof item['position'] === 'number' ? item['position'] : index + 1,
       data: { ...existingData, ...rest },
-      translations: {},
+      translations,
     }
   })
 }
