@@ -19,6 +19,8 @@ Inspirado en el bundle PHP [`letkode/form-schema-bundle`](https://github.com/let
 - [Tipos de render](#tipos-de-render)
 - [Interacciones](#interacciones)
 - [Campos sensibles al contexto](#campos-sensibles-al-contexto)
+- [Overlays por scope](#overlays-por-scope)
+- [Herencia de formularios (`extends`)](#herencia-de-formularios-extends)
 - [Extensibilidad](#extensibilidad)
 - [Integración con React / TanStack Query](#integración-con-react--tanstack-query)
 - [Referencia de API](#referencia-de-api)
@@ -120,6 +122,7 @@ name: User Profile            # nombre visible
 enabled: true                 # false = se omite completamente
 default_locale: en            # locale de respaldo para traducciones
 parameters: {}                # clave/valor arbitrario que pasa al JSON
+extends: base_form_tag        # opcional — hereda de otro formulario por tag, ver "Herencia de formularios" más abajo
 
 render:
   type: stepper               # render de nivel formulario: default | stepper | wizard | tabs
@@ -294,8 +297,38 @@ values:
 | `tree` | **Sí** | default_value → `[]` |
 | `rating` | No | `max: 5` |
 | `file` | No | `accept: null`, `multiple: false` |
+| `collector` | No | `layout: 'horizontal'`, `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `fields: []` |
 
 Todos los tipos comparten `label_style: 'default'` como parámetro base.
+
+### El tipo de campo `collector`
+
+`collector` renderiza un grupo repetible de sub-campos (ej. "agregar otro número de teléfono"). Su `parameters.fields` es un array de objetos `RawField` — la misma forma que cualquier `fields` de un grupo — que el resolver resuelve recursivamente en objetos `FormField` completos al momento de resolución:
+
+```yaml
+- tag: phones
+  name: Phone Numbers
+  type: collector
+  position: 4
+  parameters:
+    add_label: Add phone number
+    min_items: 1
+    max_items: 5
+    fields:
+      - tag: number
+        name: Number
+        type: phone
+        position: 1
+      - tag: label
+        name: Label
+        type: select
+        position: 2
+        options:
+          - value: mobile
+            label: Mobile
+          - value: home
+            label: Home
+```
 
 ---
 
@@ -468,6 +501,67 @@ resolver.resolve('user-form')
 
 ---
 
+## Herencia de formularios (`extends`)
+
+`withScope()` sirve para el **mismo** formulario variando por plataforma/entorno en runtime. `extends` sirve para cuando en realidad quieres un **formulario distinto, direccionable de forma independiente**, que comparte la mayor parte de su forma con otro — por ejemplo un formulario de edición general y una variante más acotada ("solo esta sección") del mismo, solicitados como dos tags separados.
+
+|                          | `withScope(scope)`                                     | `extends: <tag>`                                        |
+|--------------------------|----------------------------------------------------------|-------------------------------------------------------------|
+| ¿Mismo tag o distinto?    | Mismo `tag` — el resolver elige la variante               | `tag` distinto, nombrado explícitamente en el archivo derivado |
+| ¿Quién decide la variante? | El resolver, en tiempo de llamada, según el estado de `withScope()` | El autor del YAML, en tiempo de escritura                  |
+| ¿El caller lo sabe?       | Transparente — el caller solo llama `resolve('form-tag')`  | Explícito — el caller pide el tag derivado a propósito       |
+| Archivo faltante          | HTTP 404 → cae al base en silencio                        | Tag base faltante → `resolve()` lanza error                  |
+| ¿Se pueden combinar?      | Sí — un formulario derivado (`extends`) puede tener su propio overlay de scope | Sí — se aplica después de resolver la cadena de herencia |
+
+Usa `withScope` cuando es el mismo formulario lógico variando por entorno. Usa `extends` cuando es genuinamente un formulario distinto que debería compartir la mayor parte de la forma de otro en vez de duplicarla.
+
+Un formulario declara su base con un campo `extends` de nivel raíz:
+
+```yaml
+# forms/base-form.yaml
+tag: base-form
+render:
+  type: wizard
+sections:
+  - tag: general
+    groups:
+      - tag: fields
+        fields:
+          - tag: name
+            name: Name
+            type: string
+  - tag: details
+    groups:
+      - tag: fields
+        fields:
+          - tag: notes
+            name: Notes
+            type: textarea
+```
+
+```yaml
+# forms/base-form-details-only.yaml
+tag: base-form-details-only
+extends: base-form
+render:
+  type: default          # override — esta variante no es un wizard
+sections:
+  - tag: general
+    enabled: false        # oculta la sección que no aplica a esta variante
+```
+
+```ts
+resolver.resolve('base-form-details-only')
+// -> tag: 'base-form-details-only' (el propio, no el del base)
+// -> render.type: 'default' (sobrescrito)
+// -> sections: solo 'details' ('general' oculta vía enabled: false)
+// -> el campo 'notes' y todo lo demás de 'details' se hereda sin cambios
+```
+
+**Reglas de merge:** idénticas a los overlays por scope — el mismo deep-merge de `mergeRawForm` por `tag` en cada nivel (sections → groups → fields, incluyendo `parameters.fields` de collectors), el mismo `enabled: false` oculta un item heredado, el mismo reemplazo completo para `style`/`options` inline. Las cadenas de `extends` pueden tener varios niveles de profundidad (un formulario puede extender a otro que a su vez extiende a otro); una cadena circular (directa o transitivamente extendiéndose a sí misma) lanza un error en vez de resolver.
+
+---
+
 ## Extensibilidad
 
 El `FormSchemaRegistry` es el contenedor de todas las definiciones. Viene pre-cargado con todos los tipos integrados. Puedes agregar los tuyos en cualquier nivel:
@@ -593,7 +687,36 @@ Factory de conveniencia. Retorna un `FormSchemaResolver` con todas las definicio
 createFormSchemaResolver({
   baseUrl: string                    // requerido — URL base desde donde se sirven los YAML
   registry?: FormSchemaRegistry      // opcional — extiende con definiciones personalizadas
+  repository?: {
+    baseUrl: string             // URL base del backend interno
+    pathPattern: string         // ej. '/form-options/:class/:method' — placeholders ausentes se envían como query params
+    getToken?: () => string | null            // retorna el JWT enviado como `Authorization: Bearer {token}`
+    getHeaders?: () => Record<string, string> // headers extra enviados en cada request (ej. headers de
+                                               // tenant/identidad para backends multi-tenant); se llama de
+                                               // nuevo en cada request, se fusiona antes de `Authorization`
+  }
+  connections?: Record<string, {
+    baseUrl: string                  // URL base de la API externa
+    headers?: Record<string, string> // headers estáticos enviados en cada request (API keys, tokens, etc.)
+  }>
 }): FormSchemaResolver
+```
+
+`repository` configura la fuente de opciones integrada `repository` (`options_source: { type: 'repository' }`); `connections` configura la fuente integrada `api` (`options_source: { type: 'api', connection: '<key>' }`), indexada por nombre de conexión. Ambos son opcionales — se pueden omitir si un formulario nunca usa esos tipos de fuente.
+
+```ts
+const resolver = createFormSchemaResolver({
+  baseUrl: '/resources/form-schema',
+  repository: {
+    baseUrl: process.env.API_URL!,
+    pathPattern: '/form-options/:class/:method',
+    getToken: () => localStorage.getItem('jwt'),
+    getHeaders: () => ({ 'X-Tenant-Schema': getActiveTenant() }),
+  },
+  connections: {
+    geo: { baseUrl: 'https://geo.example.com', headers: { 'X-Api-Key': GEO_API_KEY } },
+  },
+})
 ```
 
 ---
@@ -609,7 +732,7 @@ Builder fluido inmutable. Cada método retorna una **nueva instancia** — el or
 | `.withScope(scope: string)` | Activa la resolución de overlays por scope; intenta cargar `{tag}.{scope}.yaml` y lo fusiona sobre el archivo base por `tag` (ver [Overlays por scope](#overlays-por-scope)) |
 | `.includingSections(tags: string[])` | Solo incluye secciones con estos tags |
 | `.excludingSections(tags: string[])` | Excluye secciones con estos tags |
-| `.resolve(formTag: string)` | Descarga, parsea y resuelve el YAML — retorna `Promise<FormSchema>` |
+| `.resolve(formTag: string)` | Descarga, parsea y resuelve el YAML — retorna `Promise<FormSchema>`. También sigue la cadena `extends` del formulario (si tiene), fusionando cada ancestro sobre su base antes de aplicar los overlays de scope (ver [Herencia de formularios](#herencia-de-formularios-extends)) |
 
 ---
 

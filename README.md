@@ -19,6 +19,8 @@ Inspired by the PHP [`letkode/form-schema-bundle`](https://github.com/letkode/fo
 - [Render types](#render-types)
 - [Interactions](#interactions)
 - [Context-aware fields](#context-aware-fields)
+- [Scope overlays](#scope-overlays)
+- [Form inheritance (`extends`)](#form-inheritance-extends)
 - [Extensibility](#extensibility)
 - [React / TanStack Query integration](#react--tanstack-query-integration)
 - [API reference](#api-reference)
@@ -120,6 +122,7 @@ name: User Profile            # display name
 enabled: true                 # false = skip entirely
 default_locale: en            # fallback locale for translations
 parameters: {}                # arbitrary key/value passed through to the JSON
+extends: base_form_tag        # optional — inherits from another form's tag, see "Form inheritance" below
 
 render:
   type: stepper               # form-level render: default | stepper | wizard | tabs
@@ -294,8 +297,38 @@ values:
 | `tree` | **Yes** | default_value → `[]` |
 | `rating` | No | `max: 5` |
 | `file` | No | `accept: null`, `multiple: false` |
+| `collector` | No | `layout: 'horizontal'`, `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `fields: []` |
 
 All types share `label_style: 'default'` as a base parameter.
+
+### The `collector` field type
+
+`collector` renders a repeatable group of sub-fields (e.g. "add another phone number"). Its `parameters.fields` is an array of `RawField` objects — the same shape as any group's `fields` entry — which the resolver recursively resolves into full `FormField` objects at resolve time:
+
+```yaml
+- tag: phones
+  name: Phone Numbers
+  type: collector
+  position: 4
+  parameters:
+    add_label: Add phone number
+    min_items: 1
+    max_items: 5
+    fields:
+      - tag: number
+        name: Number
+        type: phone
+        position: 1
+      - tag: label
+        name: Label
+        type: select
+        position: 2
+        options:
+          - value: mobile
+            label: Mobile
+          - value: home
+            label: Home
+```
 
 ---
 
@@ -468,6 +501,67 @@ resolver.resolve('user-form')
 
 ---
 
+## Form inheritance (`extends`)
+
+`withScope()` is for the **same** form varying by platform/environment at runtime. `extends` is for when you actually want a **different, independently-addressable form** that happens to share most of its shape with another — e.g. a general-purpose edit form and a narrower "just this one section" variant of it, addressed and requested as two separate tags.
+
+|                        | `withScope(scope)`                                   | `extends: <tag>`                                      |
+|------------------------|-------------------------------------------------------|---------------------------------------------------------|
+| Same tag or different? | Same `tag` — the resolver picks the variant            | Different `tag`, named explicitly in the derived file    |
+| Who decides the variant | The resolver, at call time, from `withScope()` state  | The YAML author, at write time                           |
+| Caller awareness       | Transparent — caller just calls `resolve('form-tag')`  | Explicit — caller requests the derived tag on purpose    |
+| Missing file behavior  | HTTP 404 → falls back to the base silently             | Missing base tag → `resolve()` throws                    |
+| Can combine with the other? | Yes — a derived (`extends`) form can still have its own scope overlay | Yes — applied after the inheritance chain resolves |
+
+Use `withScope` when it's the same logical form varying by environment. Use `extends` when it's genuinely a different form that should share most of another's shape instead of duplicating it.
+
+A form declares its base with a top-level `extends` field:
+
+```yaml
+# forms/base-form.yaml
+tag: base-form
+render:
+  type: wizard
+sections:
+  - tag: general
+    groups:
+      - tag: fields
+        fields:
+          - tag: name
+            name: Name
+            type: string
+  - tag: details
+    groups:
+      - tag: fields
+        fields:
+          - tag: notes
+            name: Notes
+            type: textarea
+```
+
+```yaml
+# forms/base-form-details-only.yaml
+tag: base-form-details-only
+extends: base-form
+render:
+  type: default          # override — this variant isn't a wizard
+sections:
+  - tag: general
+    enabled: false        # hide the section not relevant to this variant
+```
+
+```ts
+resolver.resolve('base-form-details-only')
+// -> tag: 'base-form-details-only' (its own tag, not the base's)
+// -> render.type: 'default' (overridden)
+// -> sections: only 'details' ('general' hidden via enabled: false)
+// -> the 'notes' field and everything else on 'details' is inherited untouched
+```
+
+**Merge rules:** identical to scope overlays — the same `mergeRawForm` deep-merge by `tag` at every level (sections → groups → fields, including collector `parameters.fields`), same `enabled: false` hides an inherited item, same wholesale replacement for `style`/inline `options`. `extends` chains can be multiple levels deep (a form can extend a form that itself extends another); a circular chain (directly or transitively extending itself) throws instead of resolving.
+
+---
+
 ## Extensibility
 
 The `FormSchemaRegistry` is the container for all definitions. It is pre-populated with every built-in type. You can add your own at any level:
@@ -593,7 +687,36 @@ Convenience factory. Returns a `FormSchemaResolver` with all built-in definition
 createFormSchemaResolver({
   baseUrl: string            // required — base URL where YAML files are served
   registry?: FormSchemaRegistry  // optional — extend with custom definitions
+  repository?: {
+    baseUrl: string             // base URL of the internal backend
+    pathPattern: string         // e.g. '/form-options/:class/:method' — missing placeholders become query params
+    getToken?: () => string | null           // returns the JWT sent as `Authorization: Bearer {token}`
+    getHeaders?: () => Record<string, string> // extra headers sent on every request (e.g. tenant/identity headers
+                                               // for multi-tenant backends); called fresh per request, merged
+                                               // before `Authorization`
+  }
+  connections?: Record<string, {
+    baseUrl: string              // base URL of the external API
+    headers?: Record<string, string> // static headers sent on every request (API keys, tokens, etc.)
+  }>
 }): FormSchemaResolver
+```
+
+`repository` configures the built-in `repository` options source (`options_source: { type: 'repository' }`); `connections` configures the built-in `api` options source (`options_source: { type: 'api', connection: '<key>' }`), keyed by connection name. Both are optional — omit them if a form never uses those source types.
+
+```ts
+const resolver = createFormSchemaResolver({
+  baseUrl: '/resources/form-schema',
+  repository: {
+    baseUrl: process.env.API_URL!,
+    pathPattern: '/form-options/:class/:method',
+    getToken: () => localStorage.getItem('jwt'),
+    getHeaders: () => ({ 'X-Tenant-Schema': getActiveTenant() }),
+  },
+  connections: {
+    geo: { baseUrl: 'https://geo.example.com', headers: { 'X-Api-Key': GEO_API_KEY } },
+  },
+})
 ```
 
 ---
@@ -609,7 +732,7 @@ Immutable fluent builder. Each method returns a **new instance** — the origina
 | `.withScope(scope: string)` | Activate scope-based overlay resolution; attempts to load `{tag}.{scope}.yaml` and deep-merges it onto the base file by `tag` (see [Scope overlays](#scope-overlays)) |
 | `.includingSections(tags: string[])` | Only include sections with these tags |
 | `.excludingSections(tags: string[])` | Exclude sections with these tags |
-| `.resolve(formTag: string)` | Fetch, parse, and resolve the YAML — returns `Promise<FormSchema>` |
+| `.resolve(formTag: string)` | Fetch, parse, and resolve the YAML — returns `Promise<FormSchema>`. Also follows the form's `extends` chain (if any), merging each ancestor onto its base before applying scope overlays (see [Form inheritance](#form-inheritance-extends)) |
 
 ---
 

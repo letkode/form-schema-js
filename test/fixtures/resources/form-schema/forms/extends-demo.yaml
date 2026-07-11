@@ -1,0 +1,9 @@
+tag: extends-demo
+name: Extends Demo
+extends: extends-base
+render:
+  type: default
+
+sections:
+  - tag: beta
+    enabled: false

@@ -1,0 +1,17 @@
+tag: extends-chain
+name: Extends Chain
+extends: extends-demo
+
+sections:
+  - tag: gamma
+    name: Gamma
+    position: 3
+    groups:
+      - tag: fields
+        name: Fields
+        position: 1
+        fields:
+          - tag: extra
+            name: Extra
+            type: string
+            position: 1

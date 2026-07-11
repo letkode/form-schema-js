@@ -75,12 +75,29 @@ export class FormSchemaResolver {
   }
 
   async resolve(formTag: string): Promise<FormSchema> {
-    const raw = await YamlLoader.loadForm(this.config.baseUrl, formTag)
+    const raw = await this.loadWithInheritance(formTag)
     if (!this.state.scope) {
       return this.resolveForm(raw)
     }
     const overlay = await YamlLoader.loadOverlay(this.config.baseUrl, formTag, this.state.scope)
     return this.resolveForm(overlay ? mergeRawForm(raw, overlay) : raw)
+  }
+
+  /**
+   * Resolves a form's `extends` chain, if any, deep-merging each file onto its
+   * base with the same tag-matching merge used for scope overlays (see
+   * `mergeRawForm`). `chain` tracks visited tags to detect and reject cycles.
+   */
+  private async loadWithInheritance(formTag: string, chain: string[] = []): Promise<RawFormFile> {
+    if (chain.includes(formTag)) {
+      throw new Error(`[form-schema] Circular "extends" reference: ${[...chain, formTag].join(' -> ')}`)
+    }
+
+    const raw = await YamlLoader.loadForm(this.config.baseUrl, formTag)
+    if (!raw.extends) return raw
+
+    const base = await this.loadWithInheritance(raw.extends, [...chain, formTag])
+    return mergeRawForm(base, raw)
   }
 
   async resolveFieldMap(formTag: string): Promise<FormFieldMap> {

@@ -816,6 +816,48 @@ assert(defaultFields.find(f => f.tag === 'hideMe') !== undefined, 'scope overlay
 assert(defaultFields.length === 3, 'scope overlay: withScope() never called — field count matches base (3)')
 
 // ---------------------------------------------------------------------------
+// Test 21: Form inheritance — extends
+// ---------------------------------------------------------------------------
+
+section('21. Form inheritance — extends')
+
+const extendsResolver = createFormSchemaResolver({ baseUrl: BASE_URL })
+
+const derivedSchema = await extendsResolver.resolve('extends-demo')
+assert(derivedSchema.tag === 'extends-demo', 'extends: resolved schema keeps the derived form\'s own tag, not the base\'s')
+assert(derivedSchema.render.type === 'default', 'extends: render.type override wins over the base\'s (wizard -> default)')
+assert(derivedSchema.sections.length === 1, 'extends: section disabled via enabled: false in the derived file is filtered out')
+assert(derivedSchema.sections[0].tag === 'alpha', 'extends: untouched section is inherited from the base')
+assert(
+  derivedSchema.sections[0].groups[0].fields.find((f) => f.tag === 'keep') !== undefined,
+  'extends: untouched field is inherited from the base',
+)
+
+// a form with no `extends` at all is unaffected (regression check)
+const baseOnlySchema = await extendsResolver.resolve('extends-base')
+assert(baseOnlySchema.tag === 'extends-base', 'extends: a form without extends resolves as before (tag)')
+assert(baseOnlySchema.render.type === 'wizard', 'extends: a form without extends resolves as before (render.type)')
+assert(baseOnlySchema.sections.length === 2, 'extends: a form without extends resolves as before (both sections present)')
+
+// multi-level chain: extends-chain -> extends-demo -> extends-base
+const chainSchema = await extendsResolver.resolve('extends-chain')
+assert(chainSchema.tag === 'extends-chain', 'extends chain: resolved schema keeps the leaf tag')
+assert(chainSchema.render.type === 'default', 'extends chain: render.type transitively inherited from the middle link, not the root')
+const chainSectionTags = chainSchema.sections.map((s) => s.tag)
+assert(chainSectionTags.includes('alpha'), 'extends chain: section from the root base is present')
+assert(!chainSectionTags.includes('beta'), 'extends chain: section disabled by the middle link stays hidden')
+assert(chainSectionTags.includes('gamma'), 'extends chain: section added by the leaf file is present')
+
+// circular extends must throw, not hang or silently drop data
+let cycleThrew = false
+try {
+  await extendsResolver.resolve('extends-cycle-self')
+} catch {
+  cycleThrew = true
+}
+assert(cycleThrew, 'extends: circular extends reference throws instead of infinite-looping')
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

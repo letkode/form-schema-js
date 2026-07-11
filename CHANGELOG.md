@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-07-11
+
+### Added
+
+- **`extends: <tag>`** — new optional top-level YAML field letting a form declare itself as a derived variant of another form (a *different, explicitly-named* tag), inheriting its shape and overriding only what differs. `resolve()` walks the chain (any depth) and deep-merges each file onto its base using the same `mergeRawForm` tag-matching merge already used for scope overlays (sections → groups → fields, `enabled: false` hides an inherited item, `style`/inline `options` replace wholesale). A circular chain (direct or transitive self-reference) throws instead of resolving.
+- Scope overlays, when active via `withScope()`, are now applied **after** the `extends` chain resolves, keyed by the originally requested tag — so a derived form can carry its own optional scope overlay independently of its base's.
+
+### Notes
+
+- **Not a replacement for `withScope()`/scope overlays** — the two solve different axes and are meant to compose, not compete. `withScope` keeps the *same* tag and lets the resolver pick a variant at runtime based on active scope (transparent to the caller, missing overlay silently falls back to base). `extends` targets a *different*, explicitly-named tag that a caller must request on purpose, declared by the form's author at write time (a missing base tag is an error, not a fallback). See the "Form inheritance" section in the README for the full side-by-side comparison.
+- Fully backward compatible: forms without `extends` resolve exactly as before, with no extra network requests.
+
+---
+
 ## [1.3.0] - 2026-07-10
 
 ### Added

@@ -307,6 +307,14 @@ export interface RawFormFile {
   render?: Partial<RenderConfig>
   translations?: Record<string, Partial<{ name: string; description: string }>>
   sections?: RawSection[]
+  /**
+   * Tag of a base form to inherit from. When set, this file is deep-merged
+   * onto the resolved base (same tag-matching merge used for scope overlays)
+   * before any further resolution — a derived, explicitly-named variant of
+   * another form rather than a same-tag runtime substitution. See "Form
+   * inheritance" vs "Scope overlays" in the README.
+   */
+  extends?: string
 }
 
 // ---------------------------------------------------------------------------

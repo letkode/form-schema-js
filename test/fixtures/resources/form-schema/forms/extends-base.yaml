@@ -1,0 +1,32 @@
+tag: extends-base
+name: Extends Base
+enabled: true
+render:
+  type: wizard
+
+sections:
+  - tag: alpha
+    name: Alpha
+    position: 1
+    groups:
+      - tag: fields
+        name: Fields
+        position: 1
+        fields:
+          - tag: keep
+            name: Keep
+            type: string
+            position: 1
+
+  - tag: beta
+    name: Beta
+    position: 2
+    groups:
+      - tag: fields
+        name: Fields
+        position: 1
+        fields:
+          - tag: other
+            name: Other
+            type: string
+            position: 1
