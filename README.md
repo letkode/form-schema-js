@@ -604,7 +604,7 @@ class ApiOptionsSource implements OptionsSourceDefinition {
     const data = await res.json() as Array<{ id: string; name: string }>
     return data.map((item, i) => ({
       value: item.id,
-      text: item.name,
+      label: item.name,
       tag: null, icon: null, color: null,
       position: i + 1,
       data: {},
@@ -623,6 +623,32 @@ const resolver = createFormSchemaResolver({
   registry,
 })
 ```
+
+### `'custom'` — a built-in escape hatch instead of one type per widget
+
+Registering a dedicated `FieldTypeDefinition`/`RenderDefinition` per widget (`ColorPickerFieldType` above) is the right call for a type you expect to reuse broadly and that has real default parameters/attributes worth centralizing. It doesn't scale as well when a project just needs to keep dropping in one-off, app-specific widgets — each one means touching the registry again.
+
+For that case, `type: 'custom'` (fields) and `render.type: 'custom'` (sections/groups) are **already built in** — `CustomFieldType`, `CustomSectionRender`, and `CustomGroupRender` are part of `ALL_FIELD_TYPES`/`ALL_SECTION_RENDERS`/`ALL_GROUP_RENDERS`, pre-registered on every `FormSchemaRegistry` instance. No `registerFieldType()`/`registerSectionRender()`/`registerGroupRender()` call needed — just use `'custom'` directly:
+
+```yaml
+- tag: permissions
+  type: custom
+  parameters:
+    key: permission-matrix   # the consuming app's own dispatch key — meaningless to this package
+```
+
+```yaml
+sections:
+  - tag: summary
+    render:
+      type: custom
+      metadata:
+        key: role-summary    # same convention — meaningless to this package
+```
+
+The consuming app's renderer does its own lookup (`field.type === 'custom'` → `PROJECT_REGISTRY[field.parameters.key]`, and the analogous `section.render.type`/`group.render.type` → `PROJECT_REGISTRY[render.metadata.key]`) before falling back to its normal per-`type` dispatch. Every future one-off widget only ever touches that project-side map — this package's registry and the `FieldType` union are never touched again, no matter how many custom widgets a project ends up building.
+
+Use a dedicated class (`AbstractFieldType`/`AbstractRender`) when a type has real default parameters/metadata worth centralizing in the package; reach for `'custom'` + `key` when it doesn't.
 
 ---
 

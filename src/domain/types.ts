@@ -26,6 +26,7 @@ export type FieldType =
   | 'rating'
   | 'file'
   | 'collector'
+  | 'custom'
 
 // ---------------------------------------------------------------------------
 // Interactions
@@ -56,18 +57,18 @@ export interface FieldInteraction {
 
 export interface FieldOption {
   value: string | number
-  text: string
+  label: string
   description: string | null
   tag: string | null
   icon: string | null
   color: string | null
   position: number
   data: Record<string, unknown>
-  translations: Record<string, Partial<{ text: string; description: string }>>
+  translations: Record<string, Partial<{ label: string; description: string }>>
 }
 
 export interface FieldOptionGroup {
-  text: string
+  label: string
   options: FieldOption[]
 }
 
@@ -90,6 +91,8 @@ export interface ResolvedOptionsSource {
   value_key: string
   /** Key in the API response object to use as option label/text */
   label_key: string
+  /** Key in the API response object to use as option description */
+  description_key: string
   /** Active locale — renderer may forward it to the backend (e.g. as Accept-Language or query param) */
   locale: string
 }
@@ -240,6 +243,8 @@ export interface RawOptionsSource {
   value_key?: string
   /** Key in the API response object to use as option label/text. Default: 'label' */
   label_key?: string
+  /** Key in the API response object to use as option description. Default: 'description' */
+  description_key?: string
   /** Extra query params sent on every request */
   params?: Record<string, unknown>
 }

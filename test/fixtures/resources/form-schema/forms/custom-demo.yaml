@@ -1,0 +1,32 @@
+tag: custom-demo
+name: Custom Demo
+enabled: true
+render:
+  type: custom
+  metadata: {}
+
+sections:
+  - tag: main
+    name: Main
+    position: 1
+    render:
+      type: custom
+      metadata:
+        key: some-summary-section
+    groups:
+      - tag: fields
+        name: Fields
+        position: 1
+        render:
+          type: custom
+          metadata:
+            key: some-custom-group
+        fields:
+          - tag: widget
+            name: Widget
+            type: custom
+            position: 1
+            attributes:
+              required: true
+            parameters:
+              key: some-project-widget

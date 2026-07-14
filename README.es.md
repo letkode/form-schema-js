@@ -604,7 +604,7 @@ class ApiOptionsSource implements OptionsSourceDefinition {
     const data = await res.json() as Array<{ id: string; nombre: string }>
     return data.map((item, i) => ({
       value: item.id,
-      text: item.nombre,
+      label: item.nombre,
       tag: null, icon: null, color: null,
       position: i + 1,
       data: {},
@@ -623,6 +623,32 @@ const resolver = createFormSchemaResolver({
   registry,
 })
 ```
+
+### `'custom'` — una válvula de escape ya integrada, en vez de un tipo por widget
+
+Registrar un `FieldTypeDefinition`/`RenderDefinition` dedicado por widget (`ColorPickerFieldType` arriba) es lo correcto para un tipo que esperás reusar ampliamente y que tiene defaults/atributos reales que vale la pena centralizar. No escala tan bien cuando un proyecto solo necesita ir agregando widgets propios, uno a uno — cada uno implica volver a tocar el registry.
+
+Para ese caso, `type: 'custom'` (fields) y `render.type: 'custom'` (sections/groups) **ya vienen integrados** — `CustomFieldType`, `CustomSectionRender` y `CustomGroupRender` forman parte de `ALL_FIELD_TYPES`/`ALL_SECTION_RENDERS`/`ALL_GROUP_RENDERS`, pre-registrados en cada instancia de `FormSchemaRegistry`. No hace falta ningún `registerFieldType()`/`registerSectionRender()`/`registerGroupRender()` — se usa `'custom'` directamente:
+
+```yaml
+- tag: permissions
+  type: custom
+  parameters:
+    key: permission-matrix   # key de despacho propia de la app consumidora — no significa nada para este paquete
+```
+
+```yaml
+sections:
+  - tag: summary
+    render:
+      type: custom
+      metadata:
+        key: role-summary    # misma convención — no significa nada para este paquete
+```
+
+El renderer de la app consumidora hace su propia búsqueda (`field.type === 'custom'` → `PROJECT_REGISTRY[field.parameters.key]`, y de forma análoga `section.render.type`/`group.render.type` → `PROJECT_REGISTRY[render.metadata.key]`) antes de caer en su dispatch normal por `type`. Cada widget custom futuro solo toca ese mapa del lado del proyecto — el registry de este paquete y la union `FieldType` nunca se vuelven a tocar, sin importar cuántos widgets custom termine construyendo el proyecto.
+
+Usá una clase dedicada (`AbstractFieldType`/`AbstractRender`) cuando un tipo tiene defaults/metadata reales que vale la pena centralizar en el paquete; usá `'custom'` + `key` cuando no.
 
 ---
 

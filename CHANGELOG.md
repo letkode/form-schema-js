@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-07-14
+
+### Changed
+
+- **BREAKING: `FieldOption.text` → `FieldOption.label`** (and `FieldOptionGroup.text` → `label`, `FieldOption.translations` entries `{ text, description }` → `{ label, description }`). The package previously mixed terminology: raw YAML input (`RawOptionValue.label`, `RawOptionsSource.label_key`) always spoke in terms of `label`, while the resolved output (`FieldOption.text`) spoke in terms of `text`. `label` is now used end-to-end, matching the `{ value, label }` convention already used by option consumers. Any renderer reading `option.text` must be updated to `option.label`.
+
+### Added
+
+- **`CustomFieldType`, `CustomSectionRender`, `CustomGroupRender`** — built-in, business-logic-free `'custom'` type/render definitions, now part of `ALL_FIELD_TYPES`/`ALL_SECTION_RENDERS`/`ALL_GROUP_RENDERS` and pre-registered on every `FormSchemaRegistry` instance. `type: 'custom'` (fields) and `render.type: 'custom'` (sections/groups) resolve out of the box — no `registerFieldType()`/`registerSectionRender()`/`registerGroupRender()` call needed. Intended as the escape hatch for project-specific one-off widgets: the consuming app dispatches on a project-defined `key` (`field.parameters.key` / `render.metadata.key`, meaningless to this package) instead of registering a dedicated class per widget.
+- **`RawOptionsSource.description_key` / `ResolvedOptionsSource.description_key`** — new optional key (default: `'description'`) letting a `repository`/`api` options source declare which field in the raw API response holds the option description, mirroring `value_key`/`label_key`.
+
+### Fixed
+
+- **`normalizeApiResponse()`** — `translations[locale]` entries from a `repository`/`api` options source are now remapped through `label_key`/`description_key` the same way the top-level fields are. Previously only the top-level `value`/`label`/`description` were remapped; nested translations were cast through as-is, so an API returning e.g. `{ id, name, translations: { en: { name, description } } }` with `label_key: name` produced a resolved `option.translations.en.name` instead of `option.translations.en.label` — silently breaking translated option labels for any backend not already using the canonical `label`/`description` keys inside `translations`.
+
+### Documentation
+
+- **"`'custom'` — a built-in escape hatch instead of one type per widget"** — new subsection under "Extensibility" covering the above, contrasted with registering a dedicated `FieldTypeDefinition`/`RenderDefinition` per widget (the existing `ColorPickerFieldType` example) — use a dedicated class when a type has real defaults/metadata worth centralizing in the package, use `'custom'` + `key` when it doesn't.
+
+---
+
 ## [1.4.1] - 2026-07-11
 
 ### Fixed

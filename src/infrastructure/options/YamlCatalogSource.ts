@@ -15,12 +15,12 @@ export class YamlCatalogSource implements OptionsSourceDefinition {
 
   private normalizeOptionTranslations(
     raw: Record<string, Partial<{ label: string; description: string }>> | undefined,
-  ): Record<string, Partial<{ text: string; description: string }>> {
+  ): Record<string, Partial<{ label: string; description: string }>> {
     if (!raw) return {}
     return Object.fromEntries(
       Object.entries(raw).map(([locale, t]) => {
-        const entry: Partial<{ text: string; description: string }> = {}
-        if (t.label !== undefined) entry.text = t.label
+        const entry: Partial<{ label: string; description: string }> = {}
+        if (t.label !== undefined) entry.label = t.label
         if (t.description !== undefined) entry.description = t.description
         return [locale, entry]
       }),
@@ -40,7 +40,7 @@ export class YamlCatalogSource implements OptionsSourceDefinition {
       const t = v.translations?.[config.locale] ?? {}
       return {
         value: v.value,
-        text: t.label ?? v.label,
+        label: t.label ?? v.label,
         description: t.description ?? v.description ?? null,
         tag: v.tag ?? null,
         icon: v.icon ?? null,

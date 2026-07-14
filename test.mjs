@@ -138,7 +138,7 @@ assert(countryField.options.length > 0, 'options resolved from catalog')
 
 const usOption = countryField.options.find(o => o.value === 'us')
 assert(usOption !== undefined, 'US option exists')
-assert(usOption.text === 'United States', 'option text is label from YAML')
+assert(usOption.label === 'United States', 'option label is label from YAML')
 assert(typeof usOption.data === 'object', 'option.data is object')
 assert(usOption.data.country_code === 'US', 'option.data.country_code resolved')
 assert(usOption.position === 1, 'option position resolved')
@@ -148,7 +148,7 @@ assert(usOption.color === null, 'option color defaults to null')
 
 const esOption = countryField.options.find(o => o.value === 'es')
 assert(esOption !== undefined, 'España option exists')
-assert(esOption.text === 'España', 'Spanish option label correct')
+assert(esOption.label === 'España', 'Spanish option label correct')
 
 // ---------------------------------------------------------------------------
 // Test 5: Radio field with catalog options
@@ -361,7 +361,7 @@ const norm1 = normalizeApiResponse(
   'uuid', 'fullname',
 )
 assert(norm1[0].value === '34ebefce', 'norm1: value mapped from uuid')
-assert(norm1[0].text === 'Juan Perez', 'norm1: text mapped from fullname')
+assert(norm1[0].label === 'Juan Perez', 'norm1: label mapped from fullname')
 assert(norm1[0].data.active === true, 'norm1: extra field goes into data')
 assert(!('fullname' in norm1[0].data), 'norm1: labelKey not duplicated in data')
 assert(!('uuid' in norm1[0].data), 'norm1: valueKey not duplicated in data')
@@ -377,8 +377,34 @@ assert(norm2[0].data.active === true, 'norm2: extra field active merged into dat
 // default keys (value / label)
 const norm3 = normalizeApiResponse([{ value: 'us', label: 'United States', code: 'US' }])
 assert(norm3[0].value === 'us', 'norm3: default value_key works')
-assert(norm3[0].text === 'United States', 'norm3: default label_key works')
+assert(norm3[0].label === 'United States', 'norm3: default label_key works')
 assert(norm3[0].data.code === 'US', 'norm3: extra field goes to data with default keys')
+
+// custom value_key/label_key with translations remapped the same way (real-world API shape)
+const norm4 = normalizeApiResponse(
+  [{
+    id: 'activities-logs',
+    name: 'Activity Log',
+    translations: {
+      en: { name: 'Activity Log', description: 'Track user actions and system events across the platform' },
+      es: { name: 'Registro de Actividad', description: 'Rastrear acciones de usuario y eventos del sistema en la plataforma' },
+    },
+  }],
+  'id', 'name',
+)
+assert(norm4[0].value === 'activities-logs', 'norm4: value mapped from id')
+assert(norm4[0].label === 'Activity Log', 'norm4: label mapped from name')
+assert(norm4[0].translations.en.label === 'Activity Log', 'norm4: translations.en.name remapped to label')
+assert(norm4[0].translations.en.description === 'Track user actions and system events across the platform', 'norm4: translations.en.description preserved')
+assert(norm4[0].translations.es.label === 'Registro de Actividad', 'norm4: translations.es.name remapped to label')
+
+// custom description_key
+const norm5 = normalizeApiResponse(
+  [{ value: 'x', label: 'X', summary: 'a short summary' }],
+  'value', 'label', 'summary',
+)
+assert(norm5[0].description === 'a short summary', 'norm5: description mapped from custom description_key')
+assert(!('summary' in norm5[0].data), 'norm5: description_key not duplicated in data')
 
 // ---------------------------------------------------------------------------
 // Test 15: RepositoryOptionsSource — lazy output (pre_load: false)
@@ -544,7 +570,7 @@ assert(eagerFetchUrl.includes('/form-options/app.hub.category_repository'), 'rep
 assert(eagerFetchAuth === 'Bearer my-jwt-token', 'repo eager: Authorization header sent')
 assert(eagerField.options.length === 2, 'repo eager: 2 options inlined')
 assert(eagerField.options[0].value === 'abc', 'repo eager: value mapped from uuid')
-assert(eagerField.options[0].text === 'Electronics', 'repo eager: text mapped from name')
+assert(eagerField.options[0].label === 'Electronics', 'repo eager: label mapped from name')
 assert(eagerField.options[0].data.active === true, 'repo eager: extra field in data')
 assert(eagerField.options_source === null, 'repo eager: options_source null when pre-loaded')
 
@@ -856,6 +882,29 @@ try {
   cycleThrew = true
 }
 assert(cycleThrew, 'extends: circular extends reference throws instead of infinite-looping')
+
+// ---------------------------------------------------------------------------
+// Test 22: Built-in 'custom' type (field/section/group) — no registration needed
+// ---------------------------------------------------------------------------
+
+section("22. Built-in 'custom' type — no registration needed")
+
+// Deliberately the plain factory, no custom registry passed — 'custom' must
+// already be a built-in, resolvable out of the box like any other type.
+const customResolver = createFormSchemaResolver({ baseUrl: BASE_URL })
+const customSchema = await customResolver.resolve('custom-demo')
+
+assert(customSchema.render.type === 'custom', "custom: form-level render.type resolves without error")
+const customSection = customSchema.sections[0]
+assert(customSection.render.type === 'custom', 'custom: section-level render.type resolves without error')
+assert(customSection.render.metadata.key === 'some-summary-section', 'custom: section render.metadata.key passes through untouched')
+const customGroup = customSection.groups[0]
+assert(customGroup.render.type === 'custom', 'custom: group-level render.type resolves without error')
+assert(customGroup.render.metadata.key === 'some-custom-group', 'custom: group render.metadata.key passes through untouched')
+const customField = customGroup.fields[0]
+assert(customField.type === 'custom', 'custom: field type resolves without error (no UnknownFieldTypeError)')
+assert(customField.parameters.key === 'some-project-widget', 'custom: field parameters.key passes through untouched')
+assert(customField.attributes.required === true, 'custom: field attributes still resolve normally (required: true from YAML)')
 
 // ---------------------------------------------------------------------------
 // Summary

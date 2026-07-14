@@ -31,7 +31,7 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
     }
 
     const data = await response.json() as Record<string, unknown>[]
-    return normalizeApiResponse(data, source.value_key, source.label_key)
+    return normalizeApiResponse(data, source.value_key, source.label_key, source.description_key)
   }
 
   buildLazyOutput(source: RawOptionsSource, config: ResolverExternalConfig): ResolvedOptionsSource {
@@ -47,6 +47,7 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
       params: {},  // already encoded in the URL
       value_key: source.value_key ?? 'value',
       label_key: source.label_key ?? 'label',
+      description_key: source.description_key ?? 'description',
       locale: config.locale,
     }
   }

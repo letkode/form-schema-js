@@ -287,7 +287,7 @@ export class FormSchemaResolver {
           const t = o.translations?.[this.state.locale] ?? {}
           return {
             value: o.value,
-            text: t.label ?? o.label,
+            label: t.label ?? o.label,
             description: t.description ?? o.description ?? null,
             tag: o.tag ?? null,
             icon: o.icon ?? null,
@@ -364,12 +364,12 @@ export class FormSchemaResolver {
 
   private normalizeOptionTranslations(
     raw: Record<string, Partial<{ label: string; description: string }>> | undefined,
-  ): Record<string, Partial<{ text: string; description: string }>> {
+  ): Record<string, Partial<{ label: string; description: string }>> {
     if (!raw) return {}
     return Object.fromEntries(
       Object.entries(raw).map(([locale, t]) => {
-        const entry: Partial<{ text: string; description: string }> = {}
-        if (t.label !== undefined) entry.text = t.label
+        const entry: Partial<{ label: string; description: string }> = {}
+        if (t.label !== undefined) entry.label = t.label
         if (t.description !== undefined) entry.description = t.description
         return [locale, entry]
       }),
