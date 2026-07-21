@@ -16,7 +16,7 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
     if (!config.repository) {
       throw new Error('[form-schema] resolver.repository config is required to use options_source type "repository"')
     }
-    const url = this.buildUrl(source, config.repository)
+    const url = this.buildUrl(source, config.repository, source.method)
     const token = config.repository.getToken?.()
 
     const headers: Record<string, string> = {
@@ -40,19 +40,25 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
     }
     return {
       type: 'repository',
-      url: this.buildUrl(source, config.repository),
+      url: this.buildUrl(source, config.repository, source.method),
       http_method: 'GET',
       requires_auth: true,
       connection: null,
-      params: {},  // already encoded in the URL
+      params: {},
       value_key: source.value_key ?? 'value',
       label_key: source.label_key ?? 'label',
       description_key: source.description_key ?? 'description',
       locale: config.locale,
+      filterBySearch: source.filter_by_search === true,
+      searchParam: source.search_param ?? 'search',
+      initUrl: source.method_init
+        ? this.buildUrl(source, config.repository, source.method_init)
+        : null,
+      keyOptionsInit: source.key_options_init ?? 'id',
     }
   }
 
-  private buildUrl(source: RawOptionsSource, repoConfig: RepositoryConfig): string {
+  private buildUrl(source: RawOptionsSource, repoConfig: RepositoryConfig, method: string | undefined): string {
     const base = repoConfig.baseUrl.replace(/\/$/, '')
     const pattern = repoConfig.pathPattern
 
@@ -61,11 +67,11 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
 
     let path = pattern
     if (hasClassSlot) path = path.replace(':class', encodeURIComponent(source.class ?? ''))
-    if (hasMethodSlot) path = path.replace(':method', encodeURIComponent(source.method ?? ''))
+    if (hasMethodSlot) path = path.replace(':method', encodeURIComponent(method ?? ''))
 
     const params = new URLSearchParams()
     if (!hasClassSlot && source.class) params.set('class', source.class)
-    if (!hasMethodSlot && source.method) params.set('method', source.method)
+    if (!hasMethodSlot && method) params.set('method', method)
 
     for (const [k, v] of Object.entries(source.params ?? {})) {
       params.set(k, String(v))

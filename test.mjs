@@ -907,6 +907,61 @@ assert(customField.parameters.key === 'some-project-widget', 'custom: field para
 assert(customField.attributes.required === true, 'custom: field attributes still resolve normally (required: true from YAML)')
 
 // ---------------------------------------------------------------------------
+// Test 23: Lazy options — filter_by_search / method_init hydration metadata
+// ---------------------------------------------------------------------------
+
+section('23. Lazy options — filter_by_search / method_init hydration metadata')
+
+// repository: defaults when neither filter_by_search nor method_init set
+const repoLazyDefaults = repoSrc.buildLazyOutput(
+  { type: 'repository', class: 'app.hub.role_repository', method: 'active-options', pre_load: false, value_key: 'id', label_key: 'name' },
+  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+)
+assert(repoLazyDefaults.filterBySearch === false, 'repo lazy defaults: filterBySearch defaults to false')
+assert(repoLazyDefaults.searchParam === 'search', 'repo lazy defaults: searchParam defaults to "search"')
+assert(repoLazyDefaults.initUrl === null, 'repo lazy defaults: initUrl is null when method_init not set')
+assert(repoLazyDefaults.keyOptionsInit === 'id', 'repo lazy defaults: keyOptionsInit defaults to "id"')
+
+// repository: filter_by_search + custom search_param
+const repoLazySearch = repoSrc.buildLazyOutput(
+  {
+    type: 'repository', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false,
+    value_key: 'uuid', label_key: 'name', filter_by_search: true, search_param: 'q',
+  },
+  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+)
+assert(repoLazySearch.filterBySearch === true, 'repo lazy search: filterBySearch true')
+assert(repoLazySearch.searchParam === 'q', 'repo lazy search: custom searchParam preserved')
+
+// repository: method_init builds a separate initUrl using the same class, swapped method
+const repoLazyInit = repoSrc.buildLazyOutput(
+  {
+    type: 'repository', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false,
+    value_key: 'uuid', label_key: 'name', method_init: 'find_by_ids', key_options_init: 'ids',
+  },
+  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+)
+assert(repoLazyInit.initUrl !== null, 'repo lazy init: initUrl built when method_init set')
+assert(repoLazyInit.initUrl.includes('/form-options/app.hub.category_repository/find_by_ids'), 'repo lazy init: initUrl uses class + method_init')
+assert(repoLazyInit.url.includes('/form-options/app.hub.category_repository/find_for_form_option'), 'repo lazy init: main url still uses method, unaffected by method_init')
+assert(repoLazyInit.keyOptionsInit === 'ids', 'repo lazy init: custom keyOptionsInit preserved')
+
+// api: defaults + method_init falls back to the same fixed endpoint url
+const apiLazyDefaults = apiSrc.buildLazyOutput(
+  { type: 'api', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname' },
+  { yamlBaseUrl: BASE_URL, connections: { crm: { baseUrl: 'https://crm.external.com', headers: {} } } },
+)
+assert(apiLazyDefaults.filterBySearch === false, 'api lazy defaults: filterBySearch defaults to false')
+assert(apiLazyDefaults.searchParam === 'search', 'api lazy defaults: searchParam defaults to "search"')
+assert(apiLazyDefaults.initUrl === null, 'api lazy defaults: initUrl is null when method_init not set')
+
+const apiLazyInit = apiSrc.buildLazyOutput(
+  { type: 'api', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname', method_init: 'by-ids' },
+  { yamlBaseUrl: BASE_URL, connections: { crm: { baseUrl: 'https://crm.external.com', headers: {} } } },
+)
+assert(apiLazyInit.initUrl === 'https://crm.external.com/v1/contacts', 'api lazy init: initUrl reuses the fixed endpoint url')
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

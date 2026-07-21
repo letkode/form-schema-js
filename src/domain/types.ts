@@ -95,6 +95,17 @@ export interface ResolvedOptionsSource {
   description_key: string
   /** Active locale — renderer may forward it to the backend (e.g. as Accept-Language or query param) */
   locale: string
+  /** Whether the renderer should re-fetch `url` as the user types a search term. Default: false */
+  filterBySearch: boolean
+  /** Query param name to use for the search term when filterBySearch is true. Default: 'search' */
+  searchParam: string
+  /**
+   * URL to hydrate already-selected values with their label (via `method_init`), or null when
+   * no `method_init` was configured — the renderer should skip hydration in that case.
+   */
+  initUrl: string | null
+  /** Query param name to send selected ids to `initUrl`, as an array. Default: 'id' */
+  keyOptionsInit: string
 }
 
 // ---------------------------------------------------------------------------
@@ -247,6 +258,23 @@ export interface RawOptionsSource {
   description_key?: string
   /** Extra query params sent on every request */
   params?: Record<string, unknown>
+  /**
+   * When lazy (pre_load: false), whether the renderer should re-fetch as the user types a
+   * search term (e.g. a searchable combobox over a large catalog). Default: false — the
+   * renderer fetches the full list once instead.
+   */
+  filter_by_search?: boolean
+  /** Query param name used to send the search term when filter_by_search is true. Default: 'search' */
+  search_param?: string
+  /**
+   * Method used to "hydrate" already-selected values with their label (e.g. when editing a
+   * record whose field value wasn't part of whatever page/search the renderer last fetched).
+   * Same class as `method`, called against the same repository path pattern. Omit to skip
+   * hydration entirely (the renderer's own fetched options are the only source of labels).
+   */
+  method_init?: string
+  /** Query param name used to send the selected ids to `method_init`, as an array. Default: 'id' */
+  key_options_init?: string
 }
 
 export interface RawFieldAttributes {

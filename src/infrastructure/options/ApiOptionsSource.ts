@@ -39,6 +39,12 @@ export class ApiOptionsSource implements OptionsSourceDefinition {
       label_key: source.label_key ?? 'label',
       description_key: source.description_key ?? 'description',
       locale: config.locale,
+      filterBySearch: source.filter_by_search === true,
+      searchParam: source.search_param ?? 'search',
+      // `api` sources have a fixed endpoint (no per-method URL slot like `repository`), so
+      // hydration re-hits the same endpoint with `key_options_init` ids appended instead.
+      initUrl: source.method_init ? url : null,
+      keyOptionsInit: source.key_options_init ?? 'id',
     }
   }
 

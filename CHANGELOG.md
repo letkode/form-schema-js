@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] - 2026-07-21
+
+### Added
+
+- **`RawOptionsSource.filter_by_search` / `ResolvedOptionsSource.filterBySearch`** — declares that a lazy (`pre_load: false`) options source should be re-fetched as the user types a search term (e.g. a searchable combobox over a large catalog), instead of the renderer fetching the full list once. Default: `false`.
+- **`RawOptionsSource.search_param` / `ResolvedOptionsSource.searchParam`** — query param name used to send the search term when `filter_by_search` is `true`. Default: `'search'`.
+- **`RawOptionsSource.method_init` / `ResolvedOptionsSource.initUrl`** — an optional secondary method (same `class`; `repository` sources reuse the `:method` URL slot, `api` sources reuse their fixed `endpoint`) used to "hydrate" already-selected values with their label — e.g. when editing a record whose current value wasn't part of whatever the renderer last fetched/searched. `initUrl` is `null` when `method_init` isn't set, signaling the renderer should skip hydration.
+- **`RawOptionsSource.key_options_init` / `ResolvedOptionsSource.keyOptionsInit`** — query param name used to send the selected ids to `initUrl`, as an array. Default: `'id'`.
+
+All four fields are additive and optional — existing `options_source` configs are unaffected.
+
 ## [1.5.0] - 2026-07-14
 
 ### Changed
