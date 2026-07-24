@@ -353,7 +353,7 @@ assert(stringFt !== undefined, 'built-in string still accessible after custom re
 
 section('14. normalizeApiResponse — response mapping')
 
-const { normalizeApiResponse, RepositoryOptionsSource, ApiOptionsSource } = await import('./dist/index.js')
+const { normalizeApiResponse, ApiInternalOptionsSource, ApiExternalOptionsSource } = await import('./dist/index.js')
 
 // simple object, no existing data key
 const norm1 = normalizeApiResponse(
@@ -407,19 +407,19 @@ assert(norm5[0].description === 'a short summary', 'norm5: description mapped fr
 assert(!('summary' in norm5[0].data), 'norm5: description_key not duplicated in data')
 
 // ---------------------------------------------------------------------------
-// Test 15: RepositoryOptionsSource — lazy output (pre_load: false)
+// Test 15: ApiInternalOptionsSource — lazy output (pre_load: false)
 // ---------------------------------------------------------------------------
 
-section('15. RepositoryOptionsSource — buildLazyOutput')
+section('15. ApiInternalOptionsSource — buildLazyOutput')
 
-const repoSrc = new RepositoryOptionsSource()
+const repoSrc = new ApiInternalOptionsSource()
 
 // pathPattern with :class/:method placeholders + params → encoded URL
 const repoLazy = repoSrc.buildLazyOutput(
-  { type: 'repository', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false, value_key: 'uuid', label_key: 'name', params: { active: true } },
-  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+  { type: 'api_internal', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false, value_key: 'uuid', label_key: 'name', params: { active: true } },
+  { yamlBaseUrl: BASE_URL, apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
 )
-assert(repoLazy.type === 'repository', 'repo lazy: type is repository')
+assert(repoLazy.type === 'api_internal', 'repo lazy: type is api_internal')
 assert(repoLazy.url.startsWith('https://api.myapp.com/form-options/'), 'repo lazy: URL starts with baseUrl+pattern')
 assert(repoLazy.url.includes('active=true'), 'repo lazy: params appended as query string')
 assert(repoLazy.requires_auth === true, 'repo lazy: requires_auth true')
@@ -429,18 +429,32 @@ assert(repoLazy.label_key === 'name', 'repo lazy: label_key preserved')
 
 // pathPattern without placeholders → class/method become query params
 const repoLazyNoSlot = repoSrc.buildLazyOutput(
-  { type: 'repository', class: 'app.hub.user_repository', method: 'find_active', params: { role: 'admin' } },
-  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options', getToken: () => 'tok' } },
+  { type: 'api_internal', class: 'app.hub.user_repository', method: 'find_active', params: { role: 'admin' } },
+  { yamlBaseUrl: BASE_URL, apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options', getToken: () => 'tok' } },
 )
 assert(repoLazyNoSlot.url.includes('class=app.hub.user_repository'), 'repo no-slot: class as query param')
 assert(repoLazyNoSlot.url.includes('method=find_active'), 'repo no-slot: method as query param')
 assert(repoLazyNoSlot.url.includes('role=admin'), 'repo no-slot: extra params included')
 
+// pathPattern with :provider placeholder → provider substituted into the path
+const repoLazyWithProvider = repoSrc.buildLazyOutput(
+  { type: 'api_internal', provider: 'form-options', class: 'app.hub.category_repository', method: 'find_for_form_option' },
+  { yamlBaseUrl: BASE_URL, apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/:provider/:class/:method', getToken: () => 'tok' } },
+)
+assert(repoLazyWithProvider.url === 'https://api.myapp.com/form-options/app.hub.category_repository/find_for_form_option', 'repo provider: substituted into path')
+
+// pathPattern without :provider slot → provider is ignored entirely, never sent as query param
+const repoLazyNoProviderSlot = repoSrc.buildLazyOutput(
+  { type: 'api_internal', provider: 'form-options', class: 'app.hub.category_repository', method: 'find_for_form_option' },
+  { yamlBaseUrl: BASE_URL, apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+)
+assert(!repoLazyNoProviderSlot.url.includes('provider'), 'repo provider: ignored when pathPattern has no :provider slot')
+
 // ---------------------------------------------------------------------------
-// Test 16: RepositoryOptionsSource — resolver emits lazy options_source field
+// Test 16: ApiInternalOptionsSource — resolver emits lazy options_source field
 // ---------------------------------------------------------------------------
 
-section('16. RepositoryOptionsSource — resolver integration (pre_load: false)')
+section('16. ApiInternalOptionsSource — resolver integration (pre_load: false)')
 
 const origFetch = globalThis.fetch
 
@@ -466,7 +480,7 @@ sections:
             type: select
             position: 1
             options_source:
-              type: repository
+              type: api_internal
               class: app.hub.category_repository
               method: find_for_form_option
               pre_load: false
@@ -487,7 +501,7 @@ const { createFormSchemaResolver: mkResolver } = await import('./dist/index.js')
 
 const lazyResolver = mkResolver({
   baseUrl: BASE_URL,
-  repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' },
+  apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' },
 })
 const lazySchema = await lazyResolver.resolve('lazy_form')
 const lazyField = lazySchema.sections[0].groups[0].fields[0]
@@ -500,10 +514,10 @@ assert(lazyField.options_source.requires_auth === true, 'repo lazy resolver: req
 globalThis.fetch = origFetch
 
 // ---------------------------------------------------------------------------
-// Test 17: RepositoryOptionsSource — eager fetch (pre_load: true)
+// Test 17: ApiInternalOptionsSource — eager fetch (pre_load: true)
 // ---------------------------------------------------------------------------
 
-section('17. RepositoryOptionsSource — eager fetch (pre_load: true)')
+section('17. ApiInternalOptionsSource — eager fetch (pre_load: true)')
 
 let eagerFetchCalled = false
 let eagerFetchUrl = ''
@@ -543,7 +557,7 @@ sections:
             type: select
             position: 1
             options_source:
-              type: repository
+              type: api_internal
               class: app.hub.category_repository
               method: find_for_form_option
               pre_load: true
@@ -560,7 +574,7 @@ sections:
 
 const eagerResolver = mkResolver({
   baseUrl: BASE_URL,
-  repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'my-jwt-token' },
+  apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'my-jwt-token' },
 })
 const eagerSchema = await eagerResolver.resolve('eager_form')
 const eagerField = eagerSchema.sections[0].groups[0].fields[0]
@@ -577,10 +591,10 @@ assert(eagerField.options_source === null, 'repo eager: options_source null when
 globalThis.fetch = origFetch
 
 // ---------------------------------------------------------------------------
-// Test 17b: RepositoryOptionsSource — getHeaders() merged into eager fetch
+// Test 17b: ApiInternalOptionsSource — getHeaders() merged into eager fetch
 // ---------------------------------------------------------------------------
 
-section('17b. RepositoryOptionsSource — repository.getHeaders()')
+section('17b. ApiInternalOptionsSource — repository.getHeaders()')
 
 let headersSeen = {}
 
@@ -610,7 +624,7 @@ sections:
             type: select
             position: 1
             options_source:
-              type: repository
+              type: api_internal
               class: app.hub.category_repository
               method: find_for_form_option
               pre_load: true
@@ -624,7 +638,7 @@ sections:
 
 const headersResolver = mkResolver({
   baseUrl: BASE_URL,
-  repository: {
+  apiInternal: {
     baseUrl: 'https://api.myapp.com',
     pathPattern: '/form-options/:class/:method',
     getToken: () => 'my-jwt-token',
@@ -641,17 +655,18 @@ assert(headersSeen['Content-Type'] === 'application/json', 'repo getHeaders: Con
 globalThis.fetch = origFetch
 
 // ---------------------------------------------------------------------------
-// Test 18: ApiOptionsSource — buildLazyOutput
+// Test 18: ApiExternalOptionsSource — buildLazyOutput
 // ---------------------------------------------------------------------------
 
-section('18. ApiOptionsSource — buildLazyOutput')
+section('18. ApiExternalOptionsSource — buildLazyOutput')
 
-const apiSrc = new ApiOptionsSource()
+const apiSrc = new ApiExternalOptionsSource()
 
 const apiLazy = apiSrc.buildLazyOutput(
-  { type: 'api', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname', params: { active: true } },
+  { type: 'api_external', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname', params: { active: true } },
   { yamlBaseUrl: BASE_URL, connections: { crm: { baseUrl: 'https://crm.external.com', headers: { 'X-API-Key': 'secret' } } } },
 )
+assert(apiLazy.type === 'api_external', 'api lazy: type is api_external')
 assert(apiLazy.url === 'https://crm.external.com/v1/contacts', 'api lazy: baseUrl+endpoint resolved')
 assert(apiLazy.http_method === 'GET', 'api lazy: http_method preserved')
 assert(apiLazy.requires_auth === false, 'api lazy: requires_auth false')
@@ -683,7 +698,7 @@ sections:
             type: select
             position: 1
             options_source:
-              type: api
+              type: api_external
               connection: crm
               endpoint: /v1/contacts
               http_method: GET
@@ -810,7 +825,7 @@ section('20. Scope overlays — withScope()')
 
 const overlayResolver = createFormSchemaResolver({
   baseUrl: BASE_URL,
-  repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' },
+  apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' },
 })
 
 const tenantSchema = await overlayResolver.withScope('tenant').resolve('overlay-demo')
@@ -912,34 +927,34 @@ assert(customField.attributes.required === true, 'custom: field attributes still
 
 section('23. Lazy options — filter_by_search / method_init hydration metadata')
 
-// repository: defaults when neither filter_by_search nor method_init set
+// apiInternal: defaults when neither filter_by_search nor method_init set
 const repoLazyDefaults = repoSrc.buildLazyOutput(
-  { type: 'repository', class: 'app.hub.role_repository', method: 'active-options', pre_load: false, value_key: 'id', label_key: 'name' },
-  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+  { type: 'api_internal', class: 'app.hub.role_repository', method: 'active-options', pre_load: false, value_key: 'id', label_key: 'name' },
+  { yamlBaseUrl: BASE_URL, apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
 )
 assert(repoLazyDefaults.filterBySearch === false, 'repo lazy defaults: filterBySearch defaults to false')
 assert(repoLazyDefaults.searchParam === 'search', 'repo lazy defaults: searchParam defaults to "search"')
 assert(repoLazyDefaults.initUrl === null, 'repo lazy defaults: initUrl is null when method_init not set')
 assert(repoLazyDefaults.keyOptionsInit === 'id', 'repo lazy defaults: keyOptionsInit defaults to "id"')
 
-// repository: filter_by_search + custom search_param
+// apiInternal: filter_by_search + custom search_param
 const repoLazySearch = repoSrc.buildLazyOutput(
   {
-    type: 'repository', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false,
+    type: 'api_internal', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false,
     value_key: 'uuid', label_key: 'name', filter_by_search: true, search_param: 'q',
   },
-  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+  { yamlBaseUrl: BASE_URL, apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
 )
 assert(repoLazySearch.filterBySearch === true, 'repo lazy search: filterBySearch true')
 assert(repoLazySearch.searchParam === 'q', 'repo lazy search: custom searchParam preserved')
 
-// repository: method_init builds a separate initUrl using the same class, swapped method
+// apiInternal: method_init builds a separate initUrl using the same class, swapped method
 const repoLazyInit = repoSrc.buildLazyOutput(
   {
-    type: 'repository', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false,
+    type: 'api_internal', class: 'app.hub.category_repository', method: 'find_for_form_option', pre_load: false,
     value_key: 'uuid', label_key: 'name', method_init: 'find_by_ids', key_options_init: 'ids',
   },
-  { yamlBaseUrl: BASE_URL, repository: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
+  { yamlBaseUrl: BASE_URL, apiInternal: { baseUrl: 'https://api.myapp.com', pathPattern: '/form-options/:class/:method', getToken: () => 'tok' } },
 )
 assert(repoLazyInit.initUrl !== null, 'repo lazy init: initUrl built when method_init set')
 assert(repoLazyInit.initUrl.includes('/form-options/app.hub.category_repository/find_by_ids'), 'repo lazy init: initUrl uses class + method_init')
@@ -948,7 +963,7 @@ assert(repoLazyInit.keyOptionsInit === 'ids', 'repo lazy init: custom keyOptions
 
 // api: defaults + method_init falls back to the same fixed endpoint url
 const apiLazyDefaults = apiSrc.buildLazyOutput(
-  { type: 'api', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname' },
+  { type: 'api_external', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname' },
   { yamlBaseUrl: BASE_URL, connections: { crm: { baseUrl: 'https://crm.external.com', headers: {} } } },
 )
 assert(apiLazyDefaults.filterBySearch === false, 'api lazy defaults: filterBySearch defaults to false')
@@ -956,7 +971,7 @@ assert(apiLazyDefaults.searchParam === 'search', 'api lazy defaults: searchParam
 assert(apiLazyDefaults.initUrl === null, 'api lazy defaults: initUrl is null when method_init not set')
 
 const apiLazyInit = apiSrc.buildLazyOutput(
-  { type: 'api', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname', method_init: 'by-ids' },
+  { type: 'api_external', connection: 'crm', endpoint: '/v1/contacts', http_method: 'GET', pre_load: false, value_key: 'uuid', label_key: 'fullname', method_init: 'by-ids' },
   { yamlBaseUrl: BASE_URL, connections: { crm: { baseUrl: 'https://crm.external.com', headers: {} } } },
 )
 assert(apiLazyInit.initUrl === 'https://crm.external.com/v1/contacts', 'api lazy init: initUrl reuses the fixed endpoint url')

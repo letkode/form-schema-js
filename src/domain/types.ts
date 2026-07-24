@@ -78,12 +78,12 @@ export interface FieldOptionGroup {
  */
 export interface ResolvedOptionsSource {
   type: string
-  /** Fully resolved URL — domain already applied from repository.baseUrl or connection.baseUrl */
+  /** Fully resolved URL — domain already applied from apiInternal.baseUrl or connection.baseUrl */
   url: string
   http_method: string
-  /** true for repository sources — renderer must send the user's JWT */
+  /** true for api_internal sources — renderer must send the user's JWT */
   requires_auth: boolean
-  /** Connection name used (api type only) — renderer may use it to look up extra headers */
+  /** Connection name used (api_external type only) — renderer may use it to look up extra headers */
   connection: string | null
   /** Query params to append on every request */
   params: Record<string, unknown>
@@ -242,14 +242,21 @@ export interface RawOptionsSource {
   pre_load?: boolean
   // --- catalog ---
   tag?: string
-  // --- repository ---
+  // --- api_internal ---
+  /**
+   * Backend provider slot (e.g. 'form-options'). Same placeholder behavior as `class`/`method`:
+   * substituted into `:provider` in `apiInternal.pathPattern` if present. Unlike `class`/`method`,
+   * if the configured `pathPattern` has no `:provider` slot the value is simply ignored — it is
+   * never appended as a query param.
+   */
+  provider?: string
   class?: string
   method?: string
-  // --- api ---
+  // --- api_external ---
   connection?: string
   endpoint?: string
   http_method?: string
-  // --- shared (repository + api) ---
+  // --- shared (api_internal + api_external) ---
   /** Key in the API response object to use as option value. Default: 'value' */
   value_key?: string
   /** Key in the API response object to use as option label/text. Default: 'label' */
@@ -269,7 +276,7 @@ export interface RawOptionsSource {
   /**
    * Method used to "hydrate" already-selected values with their label (e.g. when editing a
    * record whose field value wasn't part of whatever page/search the renderer last fetched).
-   * Same class as `method`, called against the same repository path pattern. Omit to skip
+   * Same class as `method`, called against the same api_internal path pattern. Omit to skip
    * hydration entirely (the renderer's own fetched options are the only source of labels).
    */
   method_init?: string
@@ -354,20 +361,21 @@ export interface RawFormFile {
 // Resolver external config types (used by OptionsSourceDefinition)
 // ---------------------------------------------------------------------------
 
-export interface RepositoryConfig {
-  /** Base URL of the backend (e.g. import.meta.env.VITE_API_URL) */
+export interface ApiInternalConfig {
+  /** Base URL of the internal backend (e.g. import.meta.env.VITE_API_URL) */
   baseUrl: string
   /**
-   * URL path pattern for repository calls.
-   * Use :class and :method as placeholders.
-   * If a placeholder is absent it is sent as a query param instead.
-   * Example: '/form-options/:class/:method'
+   * URL path pattern for api_internal calls.
+   * Use :class, :method and :provider as placeholders.
+   * :class and :method are sent as query params if their placeholder is absent.
+   * :provider is only substituted when present — if absent, `provider` is ignored entirely.
+   * Example: '/form-options/:provider/:class/:method'
    */
   pathPattern: string
   /** Returns the current user's JWT token to attach as Authorization header */
   getToken?: () => string | null
   /**
-   * Returns extra headers to send on every repository request (e.g. tenant
+   * Returns extra headers to send on every api_internal request (e.g. tenant
    * schema or active-identity headers required by multi-tenant backends).
    * Called fresh on each request, so it can reflect state that changes at
    * runtime (like the active identity). Merged before `Authorization`.
@@ -385,6 +393,6 @@ export interface ConnectionConfig {
 export interface ResolverExternalConfig {
   yamlBaseUrl: string
   locale: string
-  repository?: RepositoryConfig
+  apiInternal?: ApiInternalConfig
   connections?: Record<string, ConnectionConfig>
 }

@@ -8,8 +8,8 @@ import type {
 } from '../../domain/types.js'
 import type { OptionsSourceDefinition } from './YamlCatalogSource.js'
 
-export class ApiOptionsSource implements OptionsSourceDefinition {
-  getType() { return 'api' }
+export class ApiExternalOptionsSource implements OptionsSourceDefinition {
+  getType() { return 'api_external' }
   isAlwaysPreLoad() { return false }
 
   async resolve(source: RawOptionsSource, config: ResolverExternalConfig): Promise<FieldOption[]> {
@@ -29,7 +29,7 @@ export class ApiOptionsSource implements OptionsSourceDefinition {
   buildLazyOutput(source: RawOptionsSource, config: ResolverExternalConfig): ResolvedOptionsSource {
     const { url } = this.buildRequest(source, config)
     return {
-      type: 'api',
+      type: 'api_external',
       url,
       http_method: source.http_method ?? 'GET',
       requires_auth: false,
@@ -41,7 +41,7 @@ export class ApiOptionsSource implements OptionsSourceDefinition {
       locale: config.locale,
       filterBySearch: source.filter_by_search === true,
       searchParam: source.search_param ?? 'search',
-      // `api` sources have a fixed endpoint (no per-method URL slot like `repository`), so
+      // `api_external` sources have a fixed endpoint (no per-method URL slot like `api_internal`), so
       // hydration re-hits the same endpoint with `key_options_init` ids appended instead.
       initUrl: source.method_init ? url : null,
       keyOptionsInit: source.key_options_init ?? 'id',
@@ -54,7 +54,7 @@ export class ApiOptionsSource implements OptionsSourceDefinition {
   ): { url: string; headers: Record<string, string> } {
     const connectionName = source.connection
     if (!connectionName) {
-      throw new Error(`[form-schema] options_source type "api" requires a "connection" name`)
+      throw new Error(`[form-schema] options_source type "api_external" requires a "connection" name`)
     }
 
     const connection: ConnectionConfig | undefined = config.connections?.[connectionName]

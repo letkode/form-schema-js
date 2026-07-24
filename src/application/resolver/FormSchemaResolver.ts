@@ -15,7 +15,7 @@ import type {
   RawSection,
   RawGroup,
   RawField,
-  RepositoryConfig,
+  ApiInternalConfig,
   ConnectionConfig,
   ResolverExternalConfig,
 } from '../../domain/types.js'
@@ -24,9 +24,9 @@ export interface ResolverConfig {
   registry: FormSchemaRegistry
   /** Base URL where YAML files are served from (e.g. '/resources/form-schema') */
   baseUrl: string
-  /** Config for options_source type "repository" (internal backend calls) */
-  repository?: RepositoryConfig
-  /** Named external API connections for options_source type "api" */
+  /** Config for options_source type "api_internal" (internal backend calls) */
+  apiInternal?: ApiInternalConfig
+  /** Named external API connections for options_source type "api_external" */
   connections?: Record<string, ConnectionConfig>
 }
 
@@ -314,7 +314,7 @@ export class FormSchemaResolver {
     const externalConfig: ResolverExternalConfig = {
       yamlBaseUrl: this.config.baseUrl,
       locale: this.state.locale,
-      repository: this.config.repository,
+      apiInternal: this.config.apiInternal,
       connections: this.config.connections,
     }
 

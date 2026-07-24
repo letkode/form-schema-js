@@ -3,7 +3,7 @@ import type { FieldOption, RawOptionsSource, RawOptionsFile, ResolvedOptionsSour
 
 export interface OptionsSourceDefinition {
   getType(): string
-  /** Catalog is always pre-loaded; repository and api support deferred loading */
+  /** Catalog is always pre-loaded; api_internal and api_external support deferred loading */
   isAlwaysPreLoad(): boolean
   resolve(source: RawOptionsSource, config: ResolverExternalConfig): Promise<FieldOption[]>
   buildLazyOutput?(source: RawOptionsSource, config: ResolverExternalConfig): ResolvedOptionsSource

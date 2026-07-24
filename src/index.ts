@@ -23,7 +23,7 @@ export type { InteractionHandlerDefinition } from './infrastructure/interactions
 export { ALL_INTERACTION_HANDLERS } from './infrastructure/interactions/index.js'
 
 // Infrastructure — options
-export { YamlCatalogSource, RepositoryOptionsSource, ApiOptionsSource } from './infrastructure/options/index.js'
+export { YamlCatalogSource, ApiInternalOptionsSource, ApiExternalOptionsSource } from './infrastructure/options/index.js'
 export type { OptionsSourceDefinition } from './infrastructure/options/index.js'
 
 // Utils
@@ -35,14 +35,14 @@ export { normalizeApiResponse } from './utils/normalizeApiResponse.js'
 
 import { FormSchemaRegistry } from './application/registry/FormSchemaRegistry.js'
 import { FormSchemaResolver } from './application/resolver/FormSchemaResolver.js'
-import type { RepositoryConfig, ConnectionConfig } from './domain/types.js'
+import type { ApiInternalConfig, ConnectionConfig } from './domain/types.js'
 
 export interface CreateResolverConfig {
   /** Base URL where form-schema YAML files are served from (e.g. '/resources/form-schema') */
   baseUrl: string
-  /** Config for options_source type "repository" (internal backend, always authenticated) */
-  repository?: RepositoryConfig
-  /** Named external API connections for options_source type "api" */
+  /** Config for options_source type "api_internal" (internal backend, always authenticated) */
+  apiInternal?: ApiInternalConfig
+  /** Named external API connections for options_source type "api_external" */
   connections?: Record<string, ConnectionConfig>
   /** Optional pre-configured registry. If omitted a default registry with all built-ins is used. */
   registry?: FormSchemaRegistry
@@ -55,7 +55,7 @@ export interface CreateResolverConfig {
  * @example
  * const resolver = createFormSchemaResolver({
  *   baseUrl: '/resources/form-schema',
- *   repository: {
+ *   apiInternal: {
  *     baseUrl: import.meta.env.VITE_API_URL,
  *     pathPattern: '/form-options/:class/:method',
  *     getToken: () => localStorage.getItem('token'),
@@ -76,7 +76,7 @@ export function createFormSchemaResolver(config: CreateResolverConfig): FormSche
   return new FormSchemaResolver({
     registry,
     baseUrl: config.baseUrl,
-    repository: config.repository,
+    apiInternal: config.apiInternal,
     connections: config.connections,
   })
 }

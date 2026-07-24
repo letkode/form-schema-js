@@ -453,7 +453,7 @@ sections:
             name: Roles
             type: select-multiple
             options_source:
-              type: repository
+              type: api_internal
               class: hub-role-policy-provider
               method: active-options
               value_key: id
@@ -597,8 +597,8 @@ class SidebarFormRender extends AbstractRender {
 }
 
 // --- Custom options source (e.g. fetch from an API) ---
-class ApiOptionsSource implements OptionsSourceDefinition {
-  getType() { return 'api' }
+class MyCustomOptionsSource implements OptionsSourceDefinition {
+  getType() { return 'my-custom-source' }
   async resolve(tag: string, _baseUrl: string): Promise<FieldOption[]> {
     const res = await fetch(`/api/options/${tag}`)
     const data = await res.json() as Array<{ id: string; name: string }>
@@ -616,7 +616,7 @@ class ApiOptionsSource implements OptionsSourceDefinition {
 const registry = new FormSchemaRegistry()
 registry.registerFieldType(new ColorPickerFieldType())
 registry.registerFormRender(new SidebarFormRender())
-registry.registerOptionsSource(new ApiOptionsSource())
+registry.registerOptionsSource(new MyCustomOptionsSource())
 
 const resolver = createFormSchemaResolver({
   baseUrl: '/resources/form-schema',
@@ -713,9 +713,11 @@ Convenience factory. Returns a `FormSchemaResolver` with all built-in definition
 createFormSchemaResolver({
   baseUrl: string            // required — base URL where YAML files are served
   registry?: FormSchemaRegistry  // optional — extend with custom definitions
-  repository?: {
+  apiInternal?: {
     baseUrl: string             // base URL of the internal backend
-    pathPattern: string         // e.g. '/form-options/:class/:method' — missing placeholders become query params
+    pathPattern: string         // e.g. '/form-options/:provider/:class/:method' — :provider, :class,
+                                 // :method: :class/:method missing from the pattern become query params;
+                                 // :provider missing from the pattern is ignored entirely (never a query param)
     getToken?: () => string | null           // returns the JWT sent as `Authorization: Bearer {token}`
     getHeaders?: () => Record<string, string> // extra headers sent on every request (e.g. tenant/identity headers
                                                // for multi-tenant backends); called fresh per request, merged
@@ -728,12 +730,12 @@ createFormSchemaResolver({
 }): FormSchemaResolver
 ```
 
-`repository` configures the built-in `repository` options source (`options_source: { type: 'repository' }`); `connections` configures the built-in `api` options source (`options_source: { type: 'api', connection: '<key>' }`), keyed by connection name. Both are optional — omit them if a form never uses those source types.
+`apiInternal` configures the built-in `api_internal` options source (`options_source: { type: 'api_internal' }`) — always-authenticated calls to your own backend; `connections` configures the built-in `api_external` options source (`options_source: { type: 'api_external', connection: '<key>' }`), keyed by connection name. Both are optional — omit them if a form never uses those source types.
 
 ```ts
 const resolver = createFormSchemaResolver({
   baseUrl: '/resources/form-schema',
-  repository: {
+  apiInternal: {
     baseUrl: process.env.API_URL!,
     pathPattern: '/form-options/:class/:method',
     getToken: () => localStorage.getItem('jwt'),

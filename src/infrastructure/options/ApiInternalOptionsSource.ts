@@ -4,30 +4,30 @@ import type {
   RawOptionsSource,
   ResolvedOptionsSource,
   ResolverExternalConfig,
-  RepositoryConfig,
+  ApiInternalConfig,
 } from '../../domain/types.js'
 import type { OptionsSourceDefinition } from './YamlCatalogSource.js'
 
-export class RepositoryOptionsSource implements OptionsSourceDefinition {
-  getType() { return 'repository' }
+export class ApiInternalOptionsSource implements OptionsSourceDefinition {
+  getType() { return 'api_internal' }
   isAlwaysPreLoad() { return false }
 
   async resolve(source: RawOptionsSource, config: ResolverExternalConfig): Promise<FieldOption[]> {
-    if (!config.repository) {
-      throw new Error('[form-schema] resolver.repository config is required to use options_source type "repository"')
+    if (!config.apiInternal) {
+      throw new Error('[form-schema] resolver.apiInternal config is required to use options_source type "api_internal"')
     }
-    const url = this.buildUrl(source, config.repository, source.method)
-    const token = config.repository.getToken?.()
+    const url = this.buildUrl(source, config.apiInternal, source.method)
+    const token = config.apiInternal.getToken?.()
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(config.repository.getHeaders?.() ?? {}),
+      ...(config.apiInternal.getHeaders?.() ?? {}),
     }
     if (token) headers['Authorization'] = `Bearer ${token}`
 
     const response = await fetch(url, { method: 'GET', headers })
     if (!response.ok) {
-      throw new Error(`[form-schema] Repository options fetch failed for "${source.class}.${source.method}" — ${url} (${response.status})`)
+      throw new Error(`[form-schema] Internal API options fetch failed for "${source.class}.${source.method}" — ${url} (${response.status})`)
     }
 
     const data = await response.json() as Record<string, unknown>[]
@@ -35,12 +35,12 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
   }
 
   buildLazyOutput(source: RawOptionsSource, config: ResolverExternalConfig): ResolvedOptionsSource {
-    if (!config.repository) {
-      throw new Error('[form-schema] resolver.repository config is required to build lazy output for type "repository"')
+    if (!config.apiInternal) {
+      throw new Error('[form-schema] resolver.apiInternal config is required to build lazy output for type "api_internal"')
     }
     return {
-      type: 'repository',
-      url: this.buildUrl(source, config.repository, source.method),
+      type: 'api_internal',
+      url: this.buildUrl(source, config.apiInternal, source.method),
       http_method: 'GET',
       requires_auth: true,
       connection: null,
@@ -52,20 +52,22 @@ export class RepositoryOptionsSource implements OptionsSourceDefinition {
       filterBySearch: source.filter_by_search === true,
       searchParam: source.search_param ?? 'search',
       initUrl: source.method_init
-        ? this.buildUrl(source, config.repository, source.method_init)
+        ? this.buildUrl(source, config.apiInternal, source.method_init)
         : null,
       keyOptionsInit: source.key_options_init ?? 'id',
     }
   }
 
-  private buildUrl(source: RawOptionsSource, repoConfig: RepositoryConfig, method: string | undefined): string {
-    const base = repoConfig.baseUrl.replace(/\/$/, '')
-    const pattern = repoConfig.pathPattern
+  private buildUrl(source: RawOptionsSource, apiInternalConfig: ApiInternalConfig, method: string | undefined): string {
+    const base = apiInternalConfig.baseUrl.replace(/\/$/, '')
+    const pattern = apiInternalConfig.pathPattern
 
+    const hasProviderSlot = pattern.includes(':provider')
     const hasClassSlot = pattern.includes(':class')
     const hasMethodSlot = pattern.includes(':method')
 
     let path = pattern
+    if (hasProviderSlot) path = path.replace(':provider', encodeURIComponent(source.provider ?? ''))
     if (hasClassSlot) path = path.replace(':class', encodeURIComponent(source.class ?? ''))
     if (hasMethodSlot) path = path.replace(':method', encodeURIComponent(method ?? ''))
 

@@ -21,7 +21,7 @@ sections:
             type: select-multiple
             position: 2
             options_source:
-              type: repository
+              type: api_internal
               class: base-provider
               method: options
               value_key: id

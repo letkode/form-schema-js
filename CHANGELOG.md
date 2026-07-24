@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2026-07-24
+
+### Changed
+
+- **BREAKING: `options_source` type `repository` → `api_internal`, `api` → `api_external`** — renamed to make the internal-vs-external distinction explicit at the naming level. `RepositoryOptionsSource` → `ApiInternalOptionsSource`, `ApiOptionsSource` → `ApiExternalOptionsSource`, `RepositoryConfig` → `ApiInternalConfig`, and the resolver/factory config key `repository` → `apiInternal`. No compatibility alias — YAML files using `type: repository`/`type: api` and any config passing `repository: {...}` must be updated. See `MIGRATION-api-internal-external.md` for the full checklist.
+
+### Added
+
+- **`RawOptionsSource.provider`** — new optional field on `api_internal` sources, substituted into a `:provider` placeholder in `apiInternal.pathPattern` the same way `class`/`method` are (e.g. `/:provider/:class/:method`), for backends that expose multiple providers under the same route pattern. Unlike `class`/`method`, if `pathPattern` has no `:provider` slot the value is silently ignored — it is never appended as a query param.
+
+### Fixed
+
+- **`ApiExternalOptionsSource.buildLazyOutput()`** — was hardcoding `type: 'api'` in its lazy output instead of the (now dynamic) type string; fixed to report the source's actual type.
+
+---
+
 ## [1.6.0] - 2026-07-21
 
 ### Added
