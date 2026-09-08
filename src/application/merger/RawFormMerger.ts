@@ -63,6 +63,16 @@ function mergeField(base: RawField, overlay: RawField): RawField {
                 ),
               }
             : {}),
+          ...(overlay.parameters.field && typeof overlay.parameters.field === 'object'
+            ? {
+                field: base.parameters?.field
+                  ? mergeField(
+                      base.parameters.field as RawField,
+                      overlay.parameters.field as RawField,
+                    )
+                  : (overlay.parameters.field as RawField),
+              }
+            : {}),
         }
       : base.parameters,
     translations: mergeTranslations(base.translations, overlay.translations),

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] - 2026-09-08
+
+### Added
+
+- **`repeater` field type** — repeats a **single** field definition N times. Same idea as `collector`, but where `collector` repeats a *group* of sub-fields (each row is an object keyed by sub-field tag), `repeater` repeats *one* field and its value is a **flat array of that field's values** (e.g. `["uuid-a", "uuid-b"]`). The child field goes in `parameters.field` (a single `RawField`) and is resolved recursively into a full `FormField` at resolve time — exactly like `collector`'s `parameters.fields`. Default parameters: `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `field: null`; `default_value` is formatted to `[]`; `takesOptions()` is `false` (the child field carries its own `options_source`). Scope overlays / `extends` deep-merge `parameters.field` by the same rules as `parameters.fields`. Additive — existing schemas are unaffected, `collector` is unchanged.
+
+---
+
 ## [1.7.0] - 2026-07-24
 
 ### Changed

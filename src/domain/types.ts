@@ -26,6 +26,7 @@ export type FieldType =
   | 'rating'
   | 'file'
   | 'collector'
+  | 'repeater'
   | 'custom'
 
 // ---------------------------------------------------------------------------
