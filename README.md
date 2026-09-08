@@ -298,7 +298,7 @@ values:
 | `rating` | No | `max: 5` |
 | `file` | No | `accept: null`, `multiple: false` |
 | `collector` | No | `layout: 'horizontal'`, `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `fields: []` |
-| `repeater` | No | `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `field: null`, default_value → `[]` |
+| `repeater` | No | `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `can_remove: true`, `field: null`, default_value → `[]` |
 
 All types share `label_style: 'default'` as a base parameter.
 
@@ -349,6 +349,7 @@ field's values**:
   parameters:
     add_label: Add subcontractor
     min_items: 1
+    can_remove: false # hide the per-row remove control (default: true)
     field:
       tag: company
       name: Subcontractor
@@ -365,6 +366,10 @@ field's values**:
 
 Resolved value shape: `collector` → `[{ number: "...", label: "..." }, ...]`;
 `repeater` → `["uuid-a", "uuid-b", ...]`.
+
+`can_remove: false` is a hint for the renderer to drop the per-row delete
+button — useful when rows are prefilled from server state that this form
+cannot actually revoke.
 
 ---
 

@@ -1031,6 +1031,7 @@ assert(repeaterField.attributes.required === true, 'repeater: required from YAML
 assert(repeaterField.parameters.add_label === 'Agregar subcontratista', 'repeater: add_label override from YAML')
 assert(repeaterField.parameters.min_items === 1, 'repeater: min_items override from YAML')
 assert(repeaterField.parameters.max_items === null, 'repeater: max_items default is null')
+assert(repeaterField.parameters.can_remove === true, 'repeater: can_remove default is true')
 assert(Array.isArray(repeaterField.default_value), 'repeater: default_value formatted to []')
 assert(repeaterField.default_value.length === 0, 'repeater: default_value is empty array')
 

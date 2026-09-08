@@ -298,7 +298,7 @@ values:
 | `rating` | No | `max: 5` |
 | `file` | No | `accept: null`, `multiple: false` |
 | `collector` | No | `layout: 'horizontal'`, `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `fields: []` |
-| `repeater` | No | `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `field: null`, default_value → `[]` |
+| `repeater` | No | `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `can_remove: true`, `field: null`, default_value → `[]` |
 
 Todos los tipos comparten `label_style: 'default'` como parámetro base.
 
@@ -349,6 +349,7 @@ sub-campo), `repeater` repite *un* campo — `parameters.field`, un único
   parameters:
     add_label: Add subcontractor
     min_items: 1
+    can_remove: false # oculta el botón de quitar por fila (default: true)
     field:
       tag: company
       name: Subcontractor
@@ -365,6 +366,10 @@ sub-campo), `repeater` repite *un* campo — `parameters.field`, un único
 
 Forma del valor resuelto: `collector` → `[{ number: "...", label: "..." }, ...]`;
 `repeater` → `["uuid-a", "uuid-b", ...]`.
+
+`can_remove: false` es una pista para el renderer: que no muestre el botón de
+borrar por fila — útil cuando las filas vienen precargadas de estado del
+servidor que este formulario no puede revocar.
 
 ---
 

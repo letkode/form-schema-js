@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.1] - 2026-09-08
+
+### Added
+
+- **`repeater` default parameter `can_remove`** (default `true`) — a renderer hint: when `false`, drop the per-row delete control. Useful when rows are prefilled from server state the form can't revoke. Additive; no behavior change unless a schema sets it.
+
+---
+
 ## [1.8.0] - 2026-09-08
 
 ### Added

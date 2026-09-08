@@ -16,7 +16,7 @@ export class RepeaterFieldType extends AbstractFieldType {
   getName() { return 'repeater' as const }
   takesOptions() { return false }
   getDefaultParameters(): Record<string, unknown> {
-    return { add_label: 'Add item', min_items: null, max_items: null, field: null }
+    return { add_label: 'Add item', min_items: null, max_items: null, can_remove: true, field: null }
   }
   override formatDefaultValue(value: unknown): unknown {
     return Array.isArray(value) ? value : []
