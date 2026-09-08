@@ -977,6 +977,73 @@ const apiLazyInit = apiSrc.buildLazyOutput(
 assert(apiLazyInit.initUrl === 'https://crm.external.com/v1/contacts', 'api lazy init: initUrl reuses the fixed endpoint url')
 
 // ---------------------------------------------------------------------------
+// Test 24: RepeaterFieldType — single child field, recursive resolution
+// ---------------------------------------------------------------------------
+
+section('24. RepeaterFieldType — single child field, recursive resolution')
+
+const repeaterFetchPrev = globalThis.fetch
+globalThis.fetch = async (input) => {
+  const url = String(input)
+  if (url.includes('/forms/')) {
+    return {
+      ok: true, status: 200,
+      text: async () => `
+tag: repeater_form
+name: Repeater Form
+sections:
+  - tag: s1
+    name: S1
+    position: 1
+    groups:
+      - tag: g1
+        name: G1
+        position: 1
+        fields:
+          - tag: subcontractors
+            name: Subcontractors
+            type: repeater
+            position: 1
+            style: [w-full]
+            attributes:
+              required: true
+            parameters:
+              add_label: Agregar subcontratista
+              min_items: 1
+              field:
+                tag: company
+                name: Subcontratista
+                type: select
+                attributes:
+                  required: true
+`,
+    }
+  }
+  return { ok: false, status: 404, text: async () => '' }
+}
+
+const repeaterResolver = mkResolver({ baseUrl: BASE_URL })
+const repeaterSchema = await repeaterResolver.resolve('repeater_form')
+const repeaterField = repeaterSchema.sections[0].groups[0].fields[0]
+
+assert(repeaterField.type === 'repeater', 'repeater: field type resolves (no UnknownFieldTypeError)')
+assert(repeaterField.attributes.required === true, 'repeater: required from YAML')
+assert(repeaterField.parameters.add_label === 'Agregar subcontratista', 'repeater: add_label override from YAML')
+assert(repeaterField.parameters.min_items === 1, 'repeater: min_items override from YAML')
+assert(repeaterField.parameters.max_items === null, 'repeater: max_items default is null')
+assert(Array.isArray(repeaterField.default_value), 'repeater: default_value formatted to []')
+assert(repeaterField.default_value.length === 0, 'repeater: default_value is empty array')
+
+const childField = repeaterField.parameters.field
+assert(childField != null && typeof childField === 'object', 'repeater: parameters.field resolved to an object')
+assert(childField.tag === 'company', 'repeater: child field tag is company')
+assert(childField.type === 'select', 'repeater: child field type is select')
+assert(childField.attributes.required === true, 'repeater: child field required from YAML')
+assert(childField.parameters.label_style === 'default', 'repeater: child field gets SelectFieldType defaults')
+
+globalThis.fetch = repeaterFetchPrev
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

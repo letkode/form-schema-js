@@ -298,6 +298,7 @@ values:
 | `rating` | No | `max: 5` |
 | `file` | No | `accept: null`, `multiple: false` |
 | `collector` | No | `layout: 'horizontal'`, `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `fields: []` |
+| `repeater` | No | `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `field: null`, default_value → `[]` |
 
 All types share `label_style: 'default'` as a base parameter.
 
@@ -329,6 +330,41 @@ All types share `label_style: 'default'` as a base parameter.
           - value: home
             label: Home
 ```
+
+### The `repeater` field type
+
+`repeater` is `collector`'s single-field sibling. Where `collector` repeats a
+*group* of sub-fields (each row is an object keyed by sub-field tag), `repeater`
+repeats *one* field — `parameters.field`, a single `RawField` resolved
+recursively into a full `FormField` — and its value is a **flat array of that
+field's values**:
+
+```yaml
+- tag: subcontractors
+  name: Subcontractors
+  type: repeater
+  position: 1
+  attributes:
+    required: true
+  parameters:
+    add_label: Add subcontractor
+    min_items: 1
+    field:
+      tag: company
+      name: Subcontractor
+      type: select
+      options_source:
+        type: api_internal
+        provider: form-options
+        class: tenant-company-provider
+        method: visible-options
+        pre_load: false
+        value_key: id
+        label_key: label
+```
+
+Resolved value shape: `collector` → `[{ number: "...", label: "..." }, ...]`;
+`repeater` → `["uuid-a", "uuid-b", ...]`.
 
 ---
 

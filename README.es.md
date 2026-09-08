@@ -298,6 +298,7 @@ values:
 | `rating` | No | `max: 5` |
 | `file` | No | `accept: null`, `multiple: false` |
 | `collector` | No | `layout: 'horizontal'`, `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `fields: []` |
+| `repeater` | No | `add_label: 'Add item'`, `min_items: null`, `max_items: null`, `field: null`, default_value → `[]` |
 
 Todos los tipos comparten `label_style: 'default'` como parámetro base.
 
@@ -329,6 +330,41 @@ Todos los tipos comparten `label_style: 'default'` como parámetro base.
           - value: home
             label: Home
 ```
+
+### El tipo de campo `repeater`
+
+`repeater` es el hermano de un solo campo de `collector`. Donde `collector`
+repite un *grupo* de sub-campos (cada fila es un objeto con clave por tag de
+sub-campo), `repeater` repite *un* campo — `parameters.field`, un único
+`RawField` resuelto recursivamente en un `FormField` completo — y su valor es un
+**array plano de los valores de ese campo**:
+
+```yaml
+- tag: subcontractors
+  name: Subcontractors
+  type: repeater
+  position: 1
+  attributes:
+    required: true
+  parameters:
+    add_label: Add subcontractor
+    min_items: 1
+    field:
+      tag: company
+      name: Subcontractor
+      type: select
+      options_source:
+        type: api_internal
+        provider: form-options
+        class: tenant-company-provider
+        method: visible-options
+        pre_load: false
+        value_key: id
+        label_key: label
+```
+
+Forma del valor resuelto: `collector` → `[{ number: "...", label: "..." }, ...]`;
+`repeater` → `["uuid-a", "uuid-b", ...]`.
 
 ---
 

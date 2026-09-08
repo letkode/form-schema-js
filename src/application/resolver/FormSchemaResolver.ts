@@ -121,6 +121,9 @@ export class FormSchemaResolver {
       if (field.type === 'collector' && Array.isArray(field.parameters.fields)) {
         this.collectFields(field.parameters.fields as FormField[], map)
       }
+      if (field.type === 'repeater' && field.parameters.field) {
+        this.collectFields([field.parameters.field as FormField], map)
+      }
     }
   }
 
@@ -219,6 +222,11 @@ export class FormSchemaResolver {
 
     if (raw.type === 'collector' && Array.isArray(raw.parameters?.fields)) {
       parameters.fields = await this.resolveFields(raw.parameters.fields as RawField[])
+    }
+
+    if (raw.type === 'repeater' && raw.parameters?.field) {
+      const [resolvedChild] = await this.resolveFields([raw.parameters.field as RawField])
+      parameters.field = resolvedChild ?? null
     }
 
     const typeAttrDefaults = fieldType.getDefaultAttributes()
